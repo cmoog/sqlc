@@ -3,11 +3,13 @@ package mysql
 import (
 	"fmt"
 	"testing"
+
+	"github.com/kyleconroy/sqlc/internal/dinosql"
 )
 
 const query = `
 /* name: GetAllStudents :many */
-SELECT school_id, id, school_id FROM students WHERE id = :id + ?
+SELECT school_id, id FROM students WHERE id = :id + ?
 `
 
 const create = `
@@ -24,6 +26,13 @@ func TestParseFile(t *testing.T) {
 	s := NewSchema()
 	_, err := parseFile(filename, s)
 	fmt.Println(err)
+}
+
+func TestGenStruct(t *testing.T) {
+	// s := NewSchema()
+	// result, _ := parseFile(filename, s)
+	// structs := result.Structs()
+	// spew.Dump(structs)
 }
 
 func TestParse(t *testing.T) {
@@ -70,4 +79,20 @@ func TestParseLeadingComment(t *testing.T) {
 
 func TestColTypeLookup(t *testing.T) {
 
+}
+
+func TestGenerate(t *testing.T) {
+	s := NewSchema()
+	result, _ := parseFile(filename, s)
+	output, err := dinosql.Generate(result, dinosql.GenerateSettings{}, dinosql.PackageSettings{
+		Name: "db",
+	})
+	if err != nil {
+		t.Errorf("Failed to generate output: %v", err)
+	}
+	for k, v := range output {
+		fmt.Println(k)
+		fmt.Println(v)
+		fmt.Println("")
+	}
 }

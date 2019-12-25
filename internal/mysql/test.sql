@@ -5,8 +5,13 @@ CREATE TABLE students (
   PRIMARY KEY (ID)
 );
 
-/* name: GetAllStudents :many */
-SELECT school_id, id, school_id FROM students WHERE id = :id + ?
+CREATE TABLE teachers ( 
+  id int,
+  school_id VARCHAR(255)
+)
 
 /* name: GetAllStudents :many */
-SELECT school_id, id, school_id FROM students WHERE id = :id + ?
+SELECT school_id, id FROM students WHERE id = :id + ?
+
+/* name: GetSomeStudents :many */
+SELECT school_id, id FROM students WHERE id < ?

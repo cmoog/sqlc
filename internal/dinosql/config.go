@@ -10,6 +10,18 @@ import (
 	"github.com/kyleconroy/sqlc/internal/pg"
 )
 
+type Config struct {
+	PackageSettings PackageSettings
+	Settings        GenerateSettings
+}
+
+func NewConfig() *Config {
+	return &Config{
+		PackageSettings: PackageSettings{},
+		Settings:        GenerateSettings{},
+	}
+}
+
 type GenerateSettings struct {
 	Version   string            `json:"version"`
 	Packages  []PackageSettings `json:"packages"`

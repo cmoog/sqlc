@@ -5,12 +5,15 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+
+	"github.com/kyleconroy/sqlc/internal/dinosql"
 	sql "vitess.io/vitess/go/vt/sqlparser"
 )
 
+// Query holds the data for walking and validating mysql querys
 type Query struct {
 	SQL              string
-	Columns          []*sql.ColumnType
+	Columns          []*sql.ColumnDefinition
 	Params           []*sql.SQLVal
 	Name             string
 	Cmd              string // TODO: Pick a better name. One of: one, many, exec, execrows
@@ -18,7 +21,7 @@ type Query struct {
 	schemaLookup     *Schema
 }
 
-func parseFile(filepath string, s *Schema) ([]*Query, error) {
+func parseFile(filepath string, s *Schema) (*Result, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open file [%v]: %v", filepath, err)
@@ -36,14 +39,21 @@ func parseFile(filepath string, s *Schema) ([]*Query, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to parse query in filepath [%v]: %v", filepath, err)
 		}
+		if result == nil {
+			continue
+		}
 		parsedQueries = append(parsedQueries, result)
 	}
 
-	return parsedQueries, nil
+	r := Result{
+		Queries: parsedQueries,
+		Schema:  s,
+		Config:  dinosql.NewConfig(),
+	}
+	return &r, nil
 }
 
 func parse(query string, s *Schema) (*Query, error) {
-	fmt.Println("Parsing query")
 	tree, err := sql.Parse(query)
 
 	if err != nil {
@@ -140,7 +150,7 @@ func (q *Query) visit(node sql.SQLNode) (bool, error) {
 			return false, err
 		}
 	default:
-		fmt.Printf("Did not handle %T\n", v)
+		// fmt.Printf("Did not handle %T\n", v)
 	}
 	return true, nil
 }
@@ -157,17 +167,20 @@ func (q *Query) visitSelect(node sql.SQLNode) (bool, error) {
 	return true, nil
 }
 
+// NewSchema gives a newly instantiated MySQL schema map
 func NewSchema() *Schema {
 	return &Schema{
 		tables: make(map[string]([]*sql.ColumnDefinition)),
 	}
 }
 
+// Schema proves that information for mapping columns in queries to their respective table definitions
+// and validating that they are correct so as to map to the correct Go type
 type Schema struct {
 	tables map[string]([]*sql.ColumnDefinition)
 }
 
-func (s *Schema) getColType(node sql.SQLNode, defaultTableName string) (*sql.ColumnType, error) {
+func (s *Schema) getColType(node sql.SQLNode, defaultTableName string) (*sql.ColumnDefinition, error) {
 	col, ok := node.(*sql.ColName)
 	if !ok {
 		return nil, fmt.Errorf("Attempted to determine the type of a non-column node")
@@ -179,12 +192,13 @@ func (s *Schema) getColType(node sql.SQLNode, defaultTableName string) (*sql.Col
 	return s.schemaLookup(defaultTableName, col.Name.String())
 }
 
+// Add add a MySQL table definition to the schema map
 func (s *Schema) Add(table *sql.DDL) {
 	name := table.Table.Name.String()
 	s.tables[name] = table.TableSpec.Columns
 }
 
-func (s *Schema) schemaLookup(table string, col string) (*sql.ColumnType, error) {
+func (s *Schema) schemaLookup(table string, col string) (*sql.ColumnDefinition, error) {
 	cols, ok := s.tables[table]
 	if !ok {
 		return nil, fmt.Errorf("Table [%v] not found in Schema", table)
@@ -192,7 +206,7 @@ func (s *Schema) schemaLookup(table string, col string) (*sql.ColumnType, error)
 
 	for _, colDef := range cols {
 		if colDef.Name.EqualString(col) {
-			return &colDef.Type, nil
+			return colDef, nil
 		}
 	}
 
