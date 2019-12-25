@@ -171,14 +171,13 @@ type Query struct {
 }
 
 type Result struct {
-	Settings GenerateSettings
-	Queries  []*Query
-	Catalog  core.Catalog
+	Queries []*Query
+	Catalog core.Catalog
+	Config  *Config
+}
 
-	// XXX: this is hack so that all of the functions used during Generate can access
-	// package settings during that process without threading them through every function
-	// call. we should probably have another type just for generation instead of reusing Result
-	packageSettings PackageSettings
+func (r Result) GetConfig() *Config {
+	return r.Config
 }
 
 func ParseQueries(c core.Catalog, settings GenerateSettings, pkg PackageSettings) (*Result, error) {
@@ -249,7 +248,7 @@ func ParseQueries(c core.Catalog, settings GenerateSettings, pkg PackageSettings
 	if len(q) == 0 {
 		return nil, fmt.Errorf("path %s contains no queries", pkg.Queries)
 	}
-	return &Result{Catalog: c, Queries: q, Settings: settings}, nil
+	return &Result{Catalog: c, Queries: q, Config: &Config{Settings: settings}}, nil
 }
 
 func location(node nodes.Node) int {
