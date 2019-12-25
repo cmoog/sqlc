@@ -82,6 +82,7 @@ func TestColTypeLookup(t *testing.T) {
 }
 
 func TestGenerate(t *testing.T) {
+	// t.Skip()
 	s := NewSchema()
 	result, _ := parseFile(filename, s)
 	output, err := dinosql.Generate(result, dinosql.GenerateSettings{}, dinosql.PackageSettings{
@@ -90,9 +91,24 @@ func TestGenerate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to generate output: %v", err)
 	}
+	for range output {
+	}
 	for k, v := range output {
 		fmt.Println(k)
 		fmt.Println(v)
 		fmt.Println("")
 	}
+}
+
+func TestParamType(t *testing.T) {
+	s := NewSchema()
+	result, _ := parseFile(filename, s)
+
+	p := result.Queries[0].Params[0]
+	keep(fmt.Sprintf("%v", p))
+	// spew.Dump(p)
+}
+
+func keep(interface{}) {
+
 }
