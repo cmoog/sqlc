@@ -90,14 +90,13 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 		if len(query.Params) == 1 {
 			p := query.Params[0]
 			gq.Arg = dinosql.GoQueryValue{
-				Name: paramName(*p),
-				Typ:  goTypeParam(p),
+				Name: p.Name(),
+				Typ:  p.GoType(),
 			}
 		} else if len(query.Params) > 1 {
 			var cols []*sqlparser.ColumnDefinition
-			for range query.Params {
-				// TODO: add the param column definition to the slice.
-				cols = append(cols, &sqlparser.ColumnDefinition{})
+			for _, p := range query.Params {
+				cols = append(cols, p.colDfn)
 			}
 			gq.Arg = dinosql.GoQueryValue{
 				Emit:   true,
@@ -175,16 +174,15 @@ func (r *Result) columnsToStruct(name string, columns []*sqlparser.ColumnDefinit
 	}
 	return &gs
 }
-func goTypeParam(p *sqlparser.SQLVal) string {
-	// TODO: add real logic here for the int values
-	return "int"
-}
 
 func goTypeCol(col *sqlparser.ColumnType) string {
 	switch col.Type {
 	case "varchar":
 		return "string"
+	case "int":
+		return "int"
 	default:
+		fmt.Printf("Handle this type directly: %v\n", col.Type)
 		return col.Type
 	}
 }
@@ -208,12 +206,4 @@ func argName(name string) string {
 		}
 	}
 	return out
-}
-
-func paramName(param sqlparser.SQLVal) string {
-	str := string(param.Val)
-	if str == "?" {
-		return ""
-	}
-	return fmt.Sprintf("dollar_%s", str[1:])
 }

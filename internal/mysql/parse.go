@@ -7,14 +7,14 @@ import (
 	"strings"
 
 	"github.com/kyleconroy/sqlc/internal/dinosql"
-	sql "vitess.io/vitess/go/vt/sqlparser"
+	"vitess.io/vitess/go/vt/sqlparser"
 )
 
 // Query holds the data for walking and validating mysql querys
 type Query struct {
 	SQL              string
-	Columns          []*sql.ColumnDefinition
-	Params           []*sql.SQLVal
+	Columns          []*sqlparser.ColumnDefinition
+	Params           []*Param
 	Name             string
 	Cmd              string // TODO: Pick a better name. One of: one, many, exec, execrows
 	defaultTableName string // for columns that are not qualified
@@ -54,33 +54,33 @@ func parseFile(filepath string, s *Schema) (*Result, error) {
 }
 
 func parse(query string, s *Schema) (*Query, error) {
-	tree, err := sql.Parse(query)
+	tree, err := sqlparser.Parse(query)
 
 	if err != nil {
 		return nil, err
 	}
 
 	switch tree := tree.(type) {
-	case *sql.Select:
+	case *sqlparser.Select:
 		defaultTableName := getDefaultTable(tree)
 		res, err := parseQuery(tree, query, s, defaultTableName)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to parse query: %v", err)
 		}
 		return res, nil
-	case *sql.Insert, *sql.Update:
-	case *sql.DDL:
+	case *sqlparser.Insert, *sqlparser.Update:
+	case *sqlparser.DDL:
 		s.Add(tree)
 		return nil, nil
 	}
 	return nil, fmt.Errorf("Failed to parse query statement: ")
 }
 
-func getDefaultTable(node sql.SQLNode) string {
+func getDefaultTable(node sqlparser.SQLNode) string {
 	var tableName string
-	visit := func(node sql.SQLNode) (bool, error) {
+	visit := func(node sqlparser.SQLNode) (bool, error) {
 		switch v := node.(type) {
-		case sql.TableName:
+		case sqlparser.TableName:
 			if name := v.Name.String(); name != "" {
 				tableName = name
 				return false, nil
@@ -88,23 +88,35 @@ func getDefaultTable(node sql.SQLNode) string {
 		}
 		return true, nil
 	}
-	sql.Walk(visit, node)
+	sqlparser.Walk(visit, node)
 	return tableName
 }
 
-func parseQuery(tree sql.Statement, query string, s *Schema, defaultTableName string) (*Query, error) {
+func parseQuery(tree sqlparser.Statement, query string, s *Schema, defaultTableName string) (*Query, error) {
 	parsedQuery := Query{
 		SQL:              query,
 		defaultTableName: defaultTableName,
 		schemaLookup:     s,
 	}
-	err := sql.Walk(parsedQuery.visit, tree)
 
+	err := sqlparser.Walk(parsedQuery.visit, tree)
 	if err != nil {
 		return nil, err
 	}
 
-	_, comments := sql.SplitMarginComments(query)
+	var paramWalker ParamSearcher
+	err = sqlparser.Walk(paramWalker.paramVisitor, tree)
+	if err != nil {
+		return nil, err
+	}
+
+	err = paramWalker.fillWithColDefinitions(s, defaultTableName)
+	if err != nil {
+		return nil, err
+	}
+	parsedQuery.Params = paramWalker.params
+
+	_, comments := sqlparser.SplitMarginComments(query)
 	err = parsedQuery.parseLeadingComment(comments.Leading)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse leading comment %v", err)
@@ -140,12 +152,10 @@ func (q *Query) parseLeadingComment(comment string) error {
 	return nil
 }
 
-func (q *Query) visit(node sql.SQLNode) (bool, error) {
+func (q *Query) visit(node sqlparser.SQLNode) (bool, error) {
 	switch v := node.(type) {
-	case *sql.SQLVal:
-		q.Params = append(q.Params, v)
-	case *sql.AliasedExpr:
-		err := sql.Walk(q.visitSelect, v)
+	case *sqlparser.AliasedExpr:
+		err := sqlparser.Walk(q.visitSelect, v)
 		if err != nil {
 			return false, err
 		}
@@ -155,9 +165,9 @@ func (q *Query) visit(node sql.SQLNode) (bool, error) {
 	return true, nil
 }
 
-func (q *Query) visitSelect(node sql.SQLNode) (bool, error) {
+func (q *Query) visitSelect(node sqlparser.SQLNode) (bool, error) {
 	switch v := node.(type) {
-	case *sql.ColName:
+	case *sqlparser.ColName:
 		colTyp, err := q.schemaLookup.getColType(v, q.defaultTableName)
 		if err != nil {
 			return false, fmt.Errorf("Failed to get column type for [%v]: %v", v.Name.String(), err)
@@ -170,18 +180,18 @@ func (q *Query) visitSelect(node sql.SQLNode) (bool, error) {
 // NewSchema gives a newly instantiated MySQL schema map
 func NewSchema() *Schema {
 	return &Schema{
-		tables: make(map[string]([]*sql.ColumnDefinition)),
+		tables: make(map[string]([]*sqlparser.ColumnDefinition)),
 	}
 }
 
 // Schema proves that information for mapping columns in queries to their respective table definitions
 // and validating that they are correct so as to map to the correct Go type
 type Schema struct {
-	tables map[string]([]*sql.ColumnDefinition)
+	tables map[string]([]*sqlparser.ColumnDefinition)
 }
 
-func (s *Schema) getColType(node sql.SQLNode, defaultTableName string) (*sql.ColumnDefinition, error) {
-	col, ok := node.(*sql.ColName)
+func (s *Schema) getColType(node sqlparser.SQLNode, defaultTableName string) (*sqlparser.ColumnDefinition, error) {
+	col, ok := node.(*sqlparser.ColName)
 	if !ok {
 		return nil, fmt.Errorf("Attempted to determine the type of a non-column node")
 	}
@@ -193,12 +203,12 @@ func (s *Schema) getColType(node sql.SQLNode, defaultTableName string) (*sql.Col
 }
 
 // Add add a MySQL table definition to the schema map
-func (s *Schema) Add(table *sql.DDL) {
+func (s *Schema) Add(table *sqlparser.DDL) {
 	name := table.Table.Name.String()
 	s.tables[name] = table.TableSpec.Columns
 }
 
-func (s *Schema) schemaLookup(table string, col string) (*sql.ColumnDefinition, error) {
+func (s *Schema) schemaLookup(table string, col string) (*sqlparser.ColumnDefinition, error) {
 	cols, ok := s.tables[table]
 	if !ok {
 		return nil, fmt.Errorf("Table [%v] not found in Schema", table)
