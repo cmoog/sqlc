@@ -2,10 +2,17 @@ package mysql
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/kyleconroy/sqlc/internal/dinosql"
+	"vitess.io/vitess/go/vt/sqlparser"
 )
+
+func init() {
+	initMockSchema()
+}
 
 const query = `
 /* name: GetAllStudents :many */
@@ -26,59 +33,6 @@ func TestParseFile(t *testing.T) {
 	s := NewSchema()
 	_, err := parseFile(filename, s)
 	fmt.Println(err)
-}
-
-func TestGenStruct(t *testing.T) {
-	// s := NewSchema()
-	// result, _ := parseFile(filename, s)
-	// structs := result.Structs()
-	// spew.Dump(structs)
-}
-
-func TestParse(t *testing.T) {
-	// parseQuery(create)
-	expectedQuery := Query{
-		Name: "GetAllStudents",
-		Cmd:  ":many",
-	}
-	schema := NewSchema()
-	_, err := parse(create, schema)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = parse(query, schema)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if expectedQuery.Name != "" {
-
-	}
-}
-
-func TestParseLeadingComment(t *testing.T) {
-	var query Query
-	var testCases = []struct {
-		input, expectedName, expectedCmd string
-	}{{
-		input:        "/* name: GetSchools :many */",
-		expectedName: "GetSchools",
-		expectedCmd:  ":many",
-	},
-	}
-	for _, testCase := range testCases {
-		err := query.parseLeadingComment(testCase.input)
-		if query.Name != testCase.expectedName {
-			t.Errorf("Leading comment parsing failed. %v", err)
-		}
-		if query.Cmd != testCase.expectedCmd {
-			t.Errorf("Leading comment parsing failed. %v", err)
-		}
-	}
-}
-
-func TestColTypeLookup(t *testing.T) {
-
 }
 
 func TestGenerate(t *testing.T) {
@@ -106,9 +60,151 @@ func TestParamType(t *testing.T) {
 
 	p := result.Queries[0].Params[0]
 	keep(fmt.Sprintf("%v", p))
-	// spew.Dump(p)
 }
 
-func keep(interface{}) {
+func keep(interface{}) {}
 
+var mockSchema *Schema
+
+func initMockSchema() {
+	var schemaMap = make(map[string][]*sqlparser.ColumnDefinition)
+	mockSchema = &Schema{
+		tables: schemaMap,
+	}
+	schemaMap["users"] = []*sqlparser.ColumnDefinition{
+		&sqlparser.ColumnDefinition{
+			Name: sqlparser.NewColIdent("first_name"),
+			Type: sqlparser.ColumnType{
+				Type:    "varchar",
+				NotNull: false,
+				// could add more here later if needed
+			},
+		},
+		&sqlparser.ColumnDefinition{
+			Name: sqlparser.NewColIdent("last_name"),
+			Type: sqlparser.ColumnType{
+				Type:    "varchar",
+				NotNull: false,
+				// could add more here later if needed
+			},
+		},
+		&sqlparser.ColumnDefinition{
+			Name: sqlparser.NewColIdent("id"),
+			Type: sqlparser.ColumnType{
+				Type:          "int",
+				NotNull:       false,
+				Autoincrement: true,
+				// could add more here later if needed
+			},
+		},
+		&sqlparser.ColumnDefinition{
+			Name: sqlparser.NewColIdent("age"),
+			Type: sqlparser.ColumnType{
+				Type:    "int",
+				NotNull: false,
+				// could add more here later if needed
+			},
+		},
+	}
+}
+
+func filterCols(allCols []*sqlparser.ColumnDefinition, tableNames map[string]struct{}) []*sqlparser.ColumnDefinition {
+	filteredCols := []*sqlparser.ColumnDefinition{}
+	for _, col := range allCols {
+		if _, ok := tableNames[col.Name.String()]; ok {
+			filteredCols = append(filteredCols, col)
+		}
+	}
+	return filteredCols
+}
+
+func TestParseUnit(t *testing.T) {
+	type expected struct {
+		query  string
+		schema *Schema
+	}
+	type testCase struct {
+		input  expected
+		output *Query
+	}
+
+	tests := []testCase{
+		testCase{
+			input: expected{
+				query: `/* name: GetNameByID :one */
+				SELECT first_name, last_name FROM users WHERE id = ?`,
+				schema: mockSchema,
+			},
+			output: &Query{
+				SQL: `/* name: GetNameByID :one */
+				SELECT first_name, last_name FROM users WHERE id = ?`,
+				Columns: filterCols(mockSchema.tables["users"], map[string]struct{}{"first_name": struct{}{}, "last_name": struct{}{}}),
+				Params: []*Param{&Param{
+					originalName: ":v1",
+					colName: &sqlparser.ColName{
+						Name:      sqlparser.NewColIdent("id"),
+						Qualifier: sqlparser.TableName{},
+					},
+					colDfn: filterCols(mockSchema.tables["users"], map[string]struct{}{"id": struct{}{}})[0],
+				}},
+				Name:             "GetNameByID",
+				Cmd:              ":one",
+				defaultTableName: "users",
+				schemaLookup:     mockSchema,
+			},
+		},
+	}
+
+	for _, testCase := range tests {
+		q, err := parse(testCase.input.query, testCase.input.schema)
+		if err != nil {
+			t.Errorf("Parsing failed withe query: [%v]\n:schema: %v", query, spew.Sdump(testCase.input.schema))
+		}
+		if !reflect.DeepEqual(testCase.output, q) {
+			t.Errorf("Parsing query returned differently than expected.")
+		}
+	}
+}
+
+func TestParseLeadingComment(t *testing.T) {
+	type expected struct {
+		name string
+		cmd  string
+	}
+	type testCase struct {
+		input  string
+		output expected
+	}
+
+	tests := []testCase{
+		testCase{
+			input:  "/* name: GetPeopleByID :many */",
+			output: expected{name: "GetPeopleByID", cmd: ":many"},
+		},
+	}
+
+	for _, tCase := range tests {
+		qu := &Query{}
+		err := qu.parseLeadingComment(tCase.input)
+		if err != nil {
+			t.Errorf("Failed to parse leading comment %v", err)
+		}
+		if qu.Name != tCase.output.name || qu.Cmd != tCase.output.cmd {
+			t.Errorf("Leading comment parser returned unexpcted result: %v\n:\n Expected: [%v]\nRecieved:[%v]\n",
+				err, spew.Sdump(tCase.output), spew.Sdump(qu))
+		}
+
+	}
+}
+
+func TestSchemaLookup(t *testing.T) {
+	firstNameColDfn, err := mockSchema.schemaLookup("users", "first_name")
+	if err != nil {
+		t.Errorf("Failed to get column schema from mock schema: %v", err)
+	}
+
+	expected := filterCols(mockSchema.tables["users"], map[string]struct{}{"first_name": struct{}{}})
+	if !reflect.DeepEqual(firstNameColDfn, expected[0]) {
+		t.Errorf("Table schema lookup returned unexpected result")
+	}
 }
