@@ -94,14 +94,10 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 				Typ:  p.GoType(),
 			}
 		} else if len(query.Params) > 1 {
-			var cols []*sqlparser.ColumnDefinition
-			for _, p := range query.Params {
-				cols = append(cols, p.colDfn)
-			}
 			gq.Arg = dinosql.GoQueryValue{
 				Emit:   true,
 				Name:   "arg",
-				Struct: r.columnsToStruct(gq.MethodName+"Params", cols),
+				Struct: r.columnsToStruct(gq.MethodName+"Params", query.Params),
 			}
 		}
 
@@ -137,7 +133,7 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 			}
 
 			if gs == nil {
-				gs = r.columnsToStruct(gq.MethodName+"Row", query.Columns)
+				gs = r.columnsToStruct(gq.MethodName+"Row", query.Params)
 				emit = true
 			}
 			gq.Ret = dinosql.GoQueryValue{
@@ -153,24 +149,24 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 	return qs
 }
 
-func (r *Result) columnsToStruct(name string, columns []*sqlparser.ColumnDefinition) *dinosql.GoStruct {
+func (r *Result) columnsToStruct(name string, params []*Param) *dinosql.GoStruct {
 	gs := dinosql.GoStruct{
 		Name: name,
 	}
 	seen := map[string]int{}
-	for i, c := range columns {
-		tagName := c.Name.String()
-		fieldName := dinosql.StructName(r, columnName(c, i))
-		if v := seen[c.Name.String()]; v > 0 {
+	for _, p := range params {
+		tagName := p.Name()
+		fieldName := dinosql.StructName(r, p.Name())
+		if v := seen[p.Name()]; v > 0 {
 			tagName = fmt.Sprintf("%s_%d", tagName, v+1)
 			fieldName = fmt.Sprintf("%s_%d", fieldName, v+1)
 		}
 		gs.Fields = append(gs.Fields, dinosql.GoField{
 			Name: fieldName,
-			Type: goTypeCol(&c.Type),
+			Type: p.typ,
 			Tags: map[string]string{"json:": tagName},
 		})
-		seen[c.Name.String()]++
+		seen[p.Name()]++
 	}
 	return &gs
 }
@@ -181,9 +177,13 @@ func goTypeCol(col *sqlparser.ColumnType) string {
 		return "string"
 	case "int":
 		return "int"
+	case "float":
+		return "float64"
 	default:
-		fmt.Printf("Handle this type directly: %v\n", col.Type)
-		return col.Type
+		// TODO: remove panic here
+		fmt.Printf("HANDLE THIS COL TYPE: %v\n", col.Type)
+		panic(fmt.Sprintf("Handle this col type directly: %v\n", col.Type))
+		// return col.Type
 	}
 }
 

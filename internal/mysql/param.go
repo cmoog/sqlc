@@ -9,13 +9,13 @@ import (
 
 type Param struct {
 	originalName string
-	colName      *sqlparser.ColName
-	colDfn       *sqlparser.ColumnDefinition
+	target       sqlparser.SQLNode
+	typ          string
 }
 
 // ParamSearcher finds the type of query params "?"
 type ParamSearcher struct {
-	parent *sqlparser.ColName
+	parent sqlparser.SQLNode
 	params []*Param
 }
 
@@ -25,18 +25,22 @@ func (p *ParamSearcher) paramVisitor(node sqlparser.SQLNode) (bool, error) {
 		if v.Type != sqlparser.ValArg {
 			break
 		}
-		if l := len(p.params); l > 0 && p.params[l-1].colName == nil {
-			p.params[l-1].colName = p.parent
+
+		// if last param
+		if l := len(p.params); l > 0 && p.params[l-1].target == nil {
+			p.params[l-1].target = p.parent
 		}
 
-		newParam := Param{originalName: string(v.Val)}
+		newParam := Param{
+			originalName: string(v.Val),
+		}
 		if p.parent != nil {
-			newParam.colName = p.parent
+			newParam.target = p.parent
 		}
 
 		p.params = append(p.params, &newParam)
 
-	case *sqlparser.ColName:
+	case *sqlparser.ColName, *sqlparser.Limit:
 		p.parent = v
 
 	default:
@@ -46,34 +50,45 @@ func (p *ParamSearcher) paramVisitor(node sqlparser.SQLNode) (bool, error) {
 	return true, nil
 }
 
-func (p *ParamSearcher) fillWithColDefinitions(s *Schema, defaultTableName string) error {
+func (p *ParamSearcher) fillParamTypes(s *Schema, defaultTableName string) error {
 	for _, param := range p.params {
-		colDfn, err := s.schemaLookup(defaultTableName, param.colName.Name.String())
-		if err != nil {
-			return err
+		switch target := param.target.(type) {
+		case *sqlparser.ColName:
+			colDfn, err := s.schemaLookup(defaultTableName, target.Name.String())
+			if err != nil {
+				return err
+			}
+			param.typ = goTypeCol(&colDfn.Type)
+
+		case *sqlparser.Limit:
+			param.typ = "uint32"
 		}
-		param.colDfn = colDfn
 	}
 	return nil
 }
 
 // Name gives the name string for use as a Go identifier
 func (p Param) Name() string {
-	str := string(p.originalName)
-	if p.colName != nil && !p.colName.Name.IsEmpty() {
-		return p.colName.Name.String()
-	}
-	if strings.HasPrefix(str, ":v") && len(str) > 2 {
-		num := string(str[2])
+	original := string(p.originalName)
+	switch v := p.target.(type) {
+	case *sqlparser.ColName:
+		// if param name is specified
+		if !strings.HasPrefix(original, ":v") {
+			return original[1:]
+		} else if v != nil && !v.Name.IsEmpty() {
+			return v.Name.String()
+		} else {
+			num := string(original[2])
+			return fmt.Sprintf("param%v", num)
+		}
+	case *sqlparser.Limit:
+		return "limit"
+	default:
+		num := string(original[2])
 		return fmt.Sprintf("param%v", num)
 	}
-	return fmt.Sprintf("dollar_%s", str[1:])
 }
 
 func (p Param) GoType() string {
-	colDfn := p.colDfn
-	if colDfn == nil {
-		return ""
-	}
-	return goTypeCol(&colDfn.Type)
+	return p.typ
 }

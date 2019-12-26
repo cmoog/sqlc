@@ -45,13 +45,12 @@ func TestGenerate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to generate output: %v", err)
 	}
-	for range output {
-	}
-	for k, v := range output {
-		fmt.Println(k)
-		fmt.Println(v)
-		fmt.Println("")
-	}
+	keep(output)
+	// for k, v := range output {
+	// 	fmt.Println(k)
+	// 	fmt.Println(v)
+	// 	fmt.Println("")
+	// }
 }
 
 func TestParamType(t *testing.T) {
@@ -106,6 +105,34 @@ func initMockSchema() {
 			},
 		},
 	}
+	schemaMap["orders"] = []*sqlparser.ColumnDefinition{
+		&sqlparser.ColumnDefinition{
+			Name: sqlparser.NewColIdent("id"),
+			Type: sqlparser.ColumnType{
+				Type:          "int",
+				NotNull:       false,
+				Autoincrement: true,
+				// could add more here later if needed
+			},
+		},
+		&sqlparser.ColumnDefinition{
+			Name: sqlparser.NewColIdent("price"),
+			Type: sqlparser.ColumnType{
+				Type:          "DECIMAL(13, 4)",
+				NotNull:       false,
+				Autoincrement: true,
+				// could add more here later if needed
+			},
+		},
+		&sqlparser.ColumnDefinition{
+			Name: sqlparser.NewColIdent("user_id"),
+			Type: sqlparser.ColumnType{
+				Type:    "int",
+				NotNull: false,
+				// could add more here later if needed
+			},
+		},
+	}
 }
 
 func filterCols(allCols []*sqlparser.ColumnDefinition, tableNames map[string]struct{}) []*sqlparser.ColumnDefinition {
@@ -136,16 +163,15 @@ func TestParseUnit(t *testing.T) {
 				schema: mockSchema,
 			},
 			output: &Query{
-				SQL: `/* name: GetNameByID :one */
-				SELECT first_name, last_name FROM users WHERE id = ?`,
+				SQL:     `select first_name, last_name from users where id = :v1`,
 				Columns: filterCols(mockSchema.tables["users"], map[string]struct{}{"first_name": struct{}{}, "last_name": struct{}{}}),
 				Params: []*Param{&Param{
 					originalName: ":v1",
-					colName: &sqlparser.ColName{
+					target: &sqlparser.ColName{
 						Name:      sqlparser.NewColIdent("id"),
 						Qualifier: sqlparser.TableName{},
 					},
-					colDfn: filterCols(mockSchema.tables["users"], map[string]struct{}{"id": struct{}{}})[0],
+					typ: "int",
 				}},
 				Name:             "GetNameByID",
 				Cmd:              ":one",
@@ -162,6 +188,7 @@ func TestParseUnit(t *testing.T) {
 		}
 		if !reflect.DeepEqual(testCase.output, q) {
 			t.Errorf("Parsing query returned differently than expected.")
+			// t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
 		}
 	}
 }

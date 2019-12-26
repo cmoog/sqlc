@@ -92,8 +92,25 @@ func getDefaultTable(node sqlparser.SQLNode) string {
 	return tableName
 }
 
+func replaceWithQuestionMarks(tree sqlparser.Statement, numParams int) sqlparser.Expr {
+	v, ok := tree.(sqlparser.Expr)
+	if !ok {
+		fmt.Printf("the tree is not an expression type")
+		return nil
+	}
+	var results sqlparser.Expr
+	for i := 1; i <= numParams; i++ {
+		results = sqlparser.ReplaceExpr(v,
+			sqlparser.NewValArg([]byte(fmt.Sprintf(":v%v", i))),
+			sqlparser.NewValArg([]byte("?")),
+		)
+	}
+	return results
+}
+
 func parseQuery(tree sqlparser.Statement, query string, s *Schema, defaultTableName string) (*Query, error) {
 	parsedQuery := Query{
+		// TODO: this query should have the :v1 params converted to ? params
 		SQL:              query,
 		defaultTableName: defaultTableName,
 		schemaLookup:     s,
@@ -109,8 +126,9 @@ func parseQuery(tree sqlparser.Statement, query string, s *Schema, defaultTableN
 	if err != nil {
 		return nil, err
 	}
+	parsedQuery.SQL = sqlparser.String(tree)
 
-	err = paramWalker.fillWithColDefinitions(s, defaultTableName)
+	err = paramWalker.fillParamTypes(s, defaultTableName)
 	if err != nil {
 		return nil, err
 	}
