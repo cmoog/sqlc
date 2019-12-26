@@ -92,21 +92,8 @@ func getDefaultTable(node sqlparser.SQLNode) string {
 	return tableName
 }
 
-func replaceWithQuestionMarks(tree sqlparser.Statement, numParams int) sqlparser.Expr {
-	v, ok := tree.(sqlparser.Expr)
-	if !ok {
-		fmt.Printf("the tree is not an expression type")
-		return nil
-	}
-	var results sqlparser.Expr
-	for i := 1; i <= numParams; i++ {
-		results = sqlparser.ReplaceExpr(v,
-			sqlparser.NewValArg([]byte(fmt.Sprintf(":v%v", i))),
-			sqlparser.NewValArg([]byte("?")),
-		)
-	}
-	return results
-}
+// TODO: better solution for this replacement
+// func replaceWithQuestionMarks(tree sqlparser.Statement, numParams int) sqlparser.Expr {
 
 func parseQuery(tree sqlparser.Statement, query string, s *Schema, defaultTableName string) (*Query, error) {
 	parsedQuery := Query{

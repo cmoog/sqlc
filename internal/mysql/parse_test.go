@@ -32,7 +32,7 @@ const filename = "test.sql"
 func TestParseFile(t *testing.T) {
 	s := NewSchema()
 	_, err := parseFile(filename, s)
-	fmt.Println(err)
+	keep(err)
 }
 
 func TestGenerate(t *testing.T) {
