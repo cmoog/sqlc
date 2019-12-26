@@ -227,3 +227,17 @@ func (s *Schema) schemaLookup(table string, col string) (*sqlparser.ColumnDefini
 
 	return nil, fmt.Errorf("Column [%v] not found in table [%v]", col, table)
 }
+
+func GeneratePkg(filepath string, settings dinosql.GenerateSettings, pkg dinosql.PackageSettings) (map[string]string, error) {
+	s := NewSchema()
+	result, err := parseFile(filepath, s)
+	if err != nil {
+		return nil, err
+	}
+	output, err := dinosql.Generate(result, settings, pkg)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to generate output: %v", err)
+	}
+
+	return output, nil
+}
