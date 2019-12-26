@@ -17,8 +17,14 @@ type Config struct {
 
 func NewConfig() *Config {
 	return &Config{
-		PackageSettings: PackageSettings{},
-		Settings:        GenerateSettings{},
+		PackageSettings: PackageSettings{
+			Overrides: []Override{
+				Override{},
+			},
+		},
+		Settings: GenerateSettings{
+			Overrides: []Override{},
+		},
 	}
 }
 
