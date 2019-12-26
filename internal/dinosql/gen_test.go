@@ -52,7 +52,9 @@ func TestColumnsToStruct(t *testing.T) {
 		cols[i].Table = pg.FQN{Schema: "public", Rel: "foo"}
 	}
 
-	r := Result{}
+	r := Result{
+		Config: NewConfig(),
+	}
 
 	// set up column-based override test
 	o := Override{
@@ -68,7 +70,7 @@ func TestColumnsToStruct(t *testing.T) {
 	}
 	oa.Parse()
 
-	r.packageSettings = PackageSettings{
+	r.GetConfig().PackageSettings = PackageSettings{
 		Overrides: []Override{o, oa},
 	}
 
@@ -91,7 +93,9 @@ func TestColumnsToStruct(t *testing.T) {
 }
 
 func TestInnerType(t *testing.T) {
-	r := Result{}
+	r := Result{
+		Config: NewConfig(),
+	}
 	types := map[string]string{
 		"integer":         "int32",
 		"int":             "int32",
@@ -118,7 +122,9 @@ func TestInnerType(t *testing.T) {
 }
 
 func TestNullInnerType(t *testing.T) {
-	r := Result{}
+	r := Result{
+		Config: NewConfig(),
+	}
 	types := map[string]string{
 		"integer":         "sql.NullInt32",
 		"int":             "sql.NullInt32",
