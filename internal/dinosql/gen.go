@@ -186,7 +186,6 @@ type Generateable interface {
 	GetConfig() *Config
 	GoQueries() []GoQuery
 	Enums() []GoEnum
-	Imports(PackageSettings) func(string) [][]string
 }
 
 func UsesType(r Generateable, Typ string) bool {
@@ -212,7 +211,7 @@ func UsesArrays(r Generateable) bool {
 	return false
 }
 
-func (r Result) Imports(settings PackageSettings) func(string) [][]string {
+func Imports(r Generateable, settings PackageSettings) func(string) [][]string {
 	return func(filename string) [][]string {
 		if filename == "db.go" {
 			imps := []string{"context", "database/sql"}
@@ -226,7 +225,7 @@ func (r Result) Imports(settings PackageSettings) func(string) [][]string {
 			return ModelImports(r)
 		}
 
-		return r.QueryImports(filename)
+		return QueryImports(r, filename)
 	}
 }
 
@@ -283,7 +282,7 @@ func ModelImports(r Generateable) [][]string {
 	return [][]string{stds, pkgs}
 }
 
-func (r Result) QueryImports(filename string) [][]string {
+func QueryImports(r Generateable, filename string) [][]string {
 	// for _, strct := range r.Structs() {
 	// 	for _, f := range strct.Fields {
 	// 		if strings.HasPrefix(f.Type, "[]") {
@@ -1083,7 +1082,7 @@ func Generate(r Generateable, global GenerateSettings, settings PackageSettings)
 	r.GetConfig().PackageSettings = settings
 	funcMap := template.FuncMap{
 		"lowerTitle": LowerTitle,
-		"imports":    r.Imports(settings),
+		"imports":    Imports(r, settings),
 	}
 
 	pkg := settings.Name
