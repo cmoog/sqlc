@@ -81,7 +81,7 @@ func TestParamSearcher(t *testing.T) {
 						Name:      sqlparser.NewColIdent("last_name"),
 						Qualifier: sqlparser.TableName{},
 					},
-					typ: "string",
+					typ: "sql.NullString",
 				},
 			},
 			expectedNames: []string{"maxAge", "inFamily"},

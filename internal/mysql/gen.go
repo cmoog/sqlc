@@ -174,11 +174,20 @@ func (r *Result) columnsToStruct(name string, params []*Param) *dinosql.GoStruct
 func goTypeCol(col *sqlparser.ColumnType) string {
 	switch t := col.Type; {
 	case "varchar" == t:
-		return "string"
+		if col.NotNull {
+			return "string"
+		}
+		return "sql.NullString"
 	case "int" == t:
-		return "int"
+		if col.NotNull {
+			return "int"
+		}
+		return "sql.NullInt64"
 	case "float" == t, strings.HasPrefix(strings.ToLower(t), "decimal"):
-		return "float64"
+		if col.NotNull {
+			return "float64"
+		}
+		return "sql.NullFloat64"
 	default:
 		// TODO: remove panic here
 		panic(fmt.Sprintf("Handle this col type directly: %v\n", col.Type))
