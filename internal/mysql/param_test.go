@@ -37,19 +37,19 @@ func TestParamSearcher(t *testing.T) {
 							FROM
 								orders
 							LEFT JOIN users ON orders.user_id = users.id
-							WHERE orders.user_id = ?`,
+							WHERE orders.price > :minPrice`,
 			output: []*Param{&Param{
-				originalName: ":v1",
+				originalName: ":minPrice",
 				target: &sqlparser.ColName{
-					Name: sqlparser.NewColIdent("user_id"),
+					Name: sqlparser.NewColIdent("price"),
 					Qualifier: sqlparser.TableName{
 						Name: sqlparser.NewTableIdent("orders"),
 					},
 				},
-				typ: "int",
+				typ: "float64",
 			},
 			},
-			expectedNames: []string{"user_id"},
+			expectedNames: []string{"minPrice"},
 		},
 		testCase{
 			input: "SELECT first_name, id, last_name FROM users WHERE id = :targetID",
