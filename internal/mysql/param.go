@@ -89,6 +89,10 @@ func (p Param) Name() string {
 	}
 }
 
-func (p Param) GoType() string {
+func (p *Param) OriginalString() string {
+	return p.Name()
+}
+
+func (p *Param) GoType() string {
 	return p.typ
 }
