@@ -94,10 +94,19 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 				Typ:  p.GoType(),
 			}
 		} else if len(query.Params) > 1 {
+
+			// needs conversion into a slice of interaces
+			// although this is dirty, it is needed for the current implementation of columnsToStruct
+			// where the first param uses the Structable interface
+			structableSlice := make([]Structable, len(query.Params))
+			for i := range query.Params {
+				structableSlice[i] = query.Params[i]
+			}
+
 			gq.Arg = dinosql.GoQueryValue{
 				Emit:   true,
 				Name:   "arg",
-				Struct: r.columnsToStruct(gq.MethodName+"Params", query.Params),
+				Struct: r.columnsToStruct(gq.MethodName+"Params", structableSlice),
 			}
 		}
 
@@ -133,7 +142,14 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 			}
 
 			if gs == nil {
-				gs = r.columnsToStruct(gq.MethodName+"Row", query.Params)
+				// needs conversion into a slice of interaces
+				// although this is dirty, it is needed for the current implementation of columnsToStruct
+				// where the first param uses the Structable interface
+				structableSlice := make([]Structable, len(query.Columns))
+				for i := range query.Columns {
+					structableSlice[i] = columnDfnAlias(*query.Columns[i])
+				}
+				gs = r.columnsToStruct(gq.MethodName+"Row", structableSlice)
 				emit = true
 			}
 			gq.Ret = dinosql.GoQueryValue{
@@ -149,24 +165,39 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 	return qs
 }
 
-func (r *Result) columnsToStruct(name string, params []*Param) *dinosql.GoStruct {
+type Structable interface {
+	OriginalString() string
+	GoType() string
+}
+type columnDfnAlias sqlparser.ColumnDefinition
+
+func (col columnDfnAlias) GoType() string {
+	return goTypeCol(&col.Type)
+}
+func (col columnDfnAlias) OriginalString() string {
+	return col.Name.String()
+}
+
+func (r *Result) columnsToStruct(name string, items []Structable) *dinosql.GoStruct {
 	gs := dinosql.GoStruct{
 		Name: name,
 	}
 	seen := map[string]int{}
-	for _, p := range params {
-		tagName := p.Name()
-		fieldName := dinosql.StructName(r, p.Name())
-		if v := seen[p.Name()]; v > 0 {
+	for _, item := range items {
+		name := item.OriginalString()
+		typ := item.GoType()
+		tagName := name
+		fieldName := dinosql.StructName(r, name)
+		if v := seen[name]; v > 0 {
 			tagName = fmt.Sprintf("%s_%d", tagName, v+1)
 			fieldName = fmt.Sprintf("%s_%d", fieldName, v+1)
 		}
 		gs.Fields = append(gs.Fields, dinosql.GoField{
 			Name: fieldName,
-			Type: p.typ,
+			Type: typ,
 			Tags: map[string]string{"json:": tagName},
 		})
-		seen[p.Name()]++
+		seen[name]++
 	}
 	return &gs
 }
