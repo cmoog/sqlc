@@ -75,7 +75,7 @@ func initMockSchema() {
 			Name: sqlparser.NewColIdent("first_name"),
 			Type: sqlparser.ColumnType{
 				Type:    "varchar",
-				NotNull: false,
+				NotNull: true,
 				// could add more here later if needed
 			},
 		},
@@ -91,7 +91,7 @@ func initMockSchema() {
 			Name: sqlparser.NewColIdent("id"),
 			Type: sqlparser.ColumnType{
 				Type:          "int",
-				NotNull:       false,
+				NotNull:       true,
 				Autoincrement: true,
 				// could add more here later if needed
 			},
@@ -100,7 +100,7 @@ func initMockSchema() {
 			Name: sqlparser.NewColIdent("age"),
 			Type: sqlparser.ColumnType{
 				Type:    "int",
-				NotNull: false,
+				NotNull: true,
 				// could add more here later if needed
 			},
 		},
@@ -110,7 +110,7 @@ func initMockSchema() {
 			Name: sqlparser.NewColIdent("id"),
 			Type: sqlparser.ColumnType{
 				Type:          "int",
-				NotNull:       false,
+				NotNull:       true,
 				Autoincrement: true,
 				// could add more here later if needed
 			},
@@ -119,7 +119,7 @@ func initMockSchema() {
 			Name: sqlparser.NewColIdent("price"),
 			Type: sqlparser.ColumnType{
 				Type:          "DECIMAL(13, 4)",
-				NotNull:       false,
+				NotNull:       true,
 				Autoincrement: true,
 				// could add more here later if needed
 			},
@@ -128,7 +128,7 @@ func initMockSchema() {
 			Name: sqlparser.NewColIdent("user_id"),
 			Type: sqlparser.ColumnType{
 				Type:    "int",
-				NotNull: false,
+				NotNull: true,
 				// could add more here later if needed
 			},
 		},
