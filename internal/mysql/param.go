@@ -19,7 +19,7 @@ type ParamSearcher struct {
 	params []*Param
 }
 
-func (p *ParamSearcher) paramVisitor(node sqlparser.SQLNode) (bool, error) {
+func (p *ParamSearcher) selectParamVisitor(node sqlparser.SQLNode) (bool, error) {
 	switch v := node.(type) {
 	case *sqlparser.SQLVal:
 		if v.Type != sqlparser.ValArg {
@@ -70,23 +70,28 @@ func (p *ParamSearcher) fillParamTypes(s *Schema, defaultTableName string) error
 // Name gives the name string for use as a Go identifier
 func (p Param) Name() string {
 	original := string(p.originalName)
-	switch v := p.target.(type) {
-	case *sqlparser.ColName:
-		// if param name is specified
+
+	cleanParamName := func(str string) string {
 		if !strings.HasPrefix(original, ":v") {
 			return original[1:]
-		} else if v != nil && !v.Name.IsEmpty() {
-			return v.Name.String()
-		} else {
-			num := string(original[2])
-			return fmt.Sprintf("param%v", num)
 		}
-	case *sqlparser.Limit:
-		return "limit"
-	default:
+		if str != "" {
+			return str
+		}
 		num := string(original[2])
 		return fmt.Sprintf("param%v", num)
 	}
+
+	switch v := p.target.(type) {
+	case *sqlparser.ColName:
+		return cleanParamName(v.Name.String())
+	case sqlparser.ColIdent:
+		return cleanParamName(v.String())
+	case *sqlparser.Limit:
+		return "limit"
+	}
+	num := string(original[2])
+	return fmt.Sprintf("param%v", num)
 }
 
 func (p *Param) OriginalString() string {
