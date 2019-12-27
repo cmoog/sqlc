@@ -30,9 +30,24 @@ const create = `
 const filename = "test.sql"
 
 func TestParseFile(t *testing.T) {
-	s := NewSchema()
-	_, err := parseFile(filename, s)
-	keep(err)
+	// s := NewSchema()
+	// _, err := parseFile(filename, s)
+	// keep(err)
+	tree, _ := sqlparser.Parse("SELECT id, first_name FROM users WHERE age < ?")
+	p := sqlparser.NewParsedQuery(tree)
+	// spew.Dump(p)
+	// for k, _ :=
+	result := sqlparser.GetBindvars(tree)
+	newVars := make(map[string]string)
+	for k := range result {
+		newVars[k] = "?"
+	}
+	// spew.Dump(newVars)
+	keep(p)
+	// p.GenerateQuery(newVars)
+	// r, _ := p.MarshalJSON()
+	// spew.Dump(string(r))
+	// spew.Dump(p.GenerateQuery())
 }
 
 func TestGenerate(t *testing.T) {
@@ -145,7 +160,7 @@ func filterCols(allCols []*sqlparser.ColumnDefinition, tableNames map[string]str
 	return filteredCols
 }
 
-func TestParseUnit(t *testing.T) {
+func TestParseSelect(t *testing.T) {
 	type expected struct {
 		query  string
 		schema *Schema
@@ -159,20 +174,22 @@ func TestParseUnit(t *testing.T) {
 		testCase{
 			input: expected{
 				query: `/* name: GetNameByID :one */
-				SELECT first_name, last_name FROM users WHERE id = ?`,
+								SELECT first_name, last_name FROM users WHERE id = ?`,
 				schema: mockSchema,
 			},
 			output: &Query{
-				SQL:     `select first_name, last_name from users where id = :v1`,
+				SQL: `/* name: GetNameByID :one */
+								SELECT first_name, last_name FROM users WHERE id = ?`,
 				Columns: filterCols(mockSchema.tables["users"], map[string]struct{}{"first_name": struct{}{}, "last_name": struct{}{}}),
-				Params: []*Param{&Param{
-					originalName: ":v1",
-					target: &sqlparser.ColName{
-						Name:      sqlparser.NewColIdent("id"),
-						Qualifier: sqlparser.TableName{},
-					},
-					typ: "int",
-				}},
+				Params: []*Param{
+					&Param{
+						originalName: ":v1",
+						target: &sqlparser.ColName{
+							Name:      sqlparser.NewColIdent("id"),
+							Qualifier: sqlparser.TableName{},
+						},
+						typ: "int",
+					}},
 				Name:             "GetNameByID",
 				Cmd:              ":one",
 				defaultTableName: "users",
@@ -182,13 +199,18 @@ func TestParseUnit(t *testing.T) {
 	}
 
 	for _, testCase := range tests {
-		q, err := parse(testCase.input.query, testCase.input.schema)
+		q, err := parseQueryString(testCase.input.query, testCase.input.schema)
+		if err != nil {
+			t.Errorf("Parsing failed withe query: [%v]\n:schema: %v", query, spew.Sdump(testCase.input.schema))
+		}
+
+		err = q.parseNameAndCmd()
 		if err != nil {
 			t.Errorf("Parsing failed withe query: [%v]\n:schema: %v", query, spew.Sdump(testCase.input.schema))
 		}
 		if !reflect.DeepEqual(testCase.output, q) {
 			t.Errorf("Parsing query returned differently than expected.")
-			// t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
+			t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
 		}
 	}
 }
@@ -233,5 +255,62 @@ func TestSchemaLookup(t *testing.T) {
 	expected := filterCols(mockSchema.tables["users"], map[string]struct{}{"first_name": struct{}{}})
 	if !reflect.DeepEqual(firstNameColDfn, expected[0]) {
 		t.Errorf("Table schema lookup returned unexpected result")
+	}
+}
+
+func TestParseInsert(t *testing.T) {
+	type expected struct {
+		query  string
+		schema *Schema
+	}
+	type testCase struct {
+		input  expected
+		output *Query
+	}
+	query1 := `/* name: InsertNewUser :exec */
+	INSERT INTO users (first_name, last_name) VALUES (?, ?)`
+	tests := []testCase{
+		testCase{
+			input: expected{
+				query:  query1,
+				schema: mockSchema,
+			},
+			output: &Query{
+				SQL:     query1,
+				Columns: nil,
+				Params: []*Param{
+					&Param{
+						originalName: ":v1",
+						target:       sqlparser.NewColIdent("first_name"),
+						typ:          "string",
+					},
+					&Param{
+						originalName: ":v2",
+						target:       sqlparser.NewColIdent("last_name"),
+						typ:          "sql.NullString",
+					},
+				},
+				Name:             "InsertNewUser",
+				Cmd:              ":exec",
+				defaultTableName: "users",
+				schemaLookup:     mockSchema,
+			},
+		},
+	}
+
+	for _, testCase := range tests {
+		q, err := parseQueryString(testCase.input.query, testCase.input.schema)
+		if err != nil {
+			t.Errorf("Parsing failed withe query: [%v]\n:schema: %v", query, spew.Sdump(testCase.input.schema))
+		}
+
+		err = q.parseNameAndCmd()
+		if err != nil {
+			t.Errorf("Parsing failed withe query: [%v]\n:schema: %v", query, spew.Sdump(testCase.input.schema))
+		}
+		if !reflect.DeepEqual(testCase.output, q) {
+			t.Errorf("Parsing query returned differently than expected.")
+			t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
+		}
 	}
 }

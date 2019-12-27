@@ -8,7 +8,7 @@ import (
 	"vitess.io/vitess/go/vt/sqlparser"
 )
 
-func TestParamSearcher(t *testing.T) {
+func TestSelectParamSearcher(t *testing.T) {
 	type testCase struct {
 		input         string
 		output        []*Param
@@ -107,10 +107,14 @@ func TestParamSearcher(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed to parse input query")
 		}
-		sqlparser.Walk(searcher.paramVisitor, tree)
+		selectStm, ok := tree.(*sqlparser.Select)
+		if !ok {
+			t.Errorf("Test case is not SELECT statement as expected")
+		}
+		sqlparser.Walk(searcher.selectParamVisitor, selectStm)
 
 		// TODO: get this out of the unit test and/or deprecate defaultTable
-		defaultTable := getDefaultTable(tree)
+		defaultTable := getDefaultTable(selectStm)
 		err = searcher.fillParamTypes(mockSchema, defaultTable)
 
 		if !reflect.DeepEqual(searcher.params, tCase.output) {
@@ -121,6 +125,61 @@ func TestParamSearcher(t *testing.T) {
 			t.Errorf("Insufficient test cases. Mismatch in length of expected param names and parsed params")
 		}
 		for ix, p := range searcher.params {
+			if p.Name() != tCase.expectedNames[ix] {
+				t.Errorf("Derived param does not match expected output.\nResult: %v\nExpected: %v",
+					p.Name(), tCase.expectedNames[ix])
+			}
+		}
+	}
+}
+
+func TestInsertParamSearcher(t *testing.T) {
+	type testCase struct {
+		input         string
+		output        []*Param
+		expectedNames []string
+	}
+
+	tests := []testCase{
+		testCase{
+			input: "INSERT INTO users (first_name, last_name) VALUES (?, ?)",
+			output: []*Param{
+				&Param{
+					originalName: ":v1",
+					target:       sqlparser.NewColIdent("first_name"),
+					typ:          "string",
+				},
+				&Param{
+					originalName: ":v2",
+					target:       sqlparser.NewColIdent("last_name"),
+					typ:          "sql.NullString",
+				},
+			},
+			expectedNames: []string{"first_name", "last_name"},
+		},
+	}
+	for _, tCase := range tests {
+		tree, err := sqlparser.Parse(tCase.input)
+		if err != nil {
+			t.Errorf("Failed to parse input query")
+		}
+		insertStm, ok := tree.(*sqlparser.Insert)
+		if !ok {
+			t.Errorf("Test case is not SELECT statement as expected")
+		}
+		result, err := parseInsert(insertStm, tCase.input, mockSchema)
+		if err != nil {
+			t.Errorf("Failed to parse insert statement.")
+		}
+
+		if !reflect.DeepEqual(result.Params, tCase.output) {
+			t.Errorf("Param searcher returned unexpected result\nResult: %v\nExpected: %v",
+				spew.Sdump(result.Params), spew.Sdump(tCase.output))
+		}
+		if len(result.Params) != len(tCase.expectedNames) {
+			t.Errorf("Insufficient test cases. Mismatch in length of expected param names and parsed params")
+		}
+		for ix, p := range result.Params {
 			if p.Name() != tCase.expectedNames[ix] {
 				t.Errorf("Derived param does not match expected output.\nResult: %v\nExpected: %v",
 					p.Name(), tCase.expectedNames[ix])

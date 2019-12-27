@@ -35,7 +35,7 @@ func parseFile(filepath string, s *Schema) (*Result, error) {
 	parsedQueries := []*Query{}
 
 	for _, query := range rawQueries {
-		result, err := parse(query, s)
+		result, err := parseQueryString(query, s)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to parse query in filepath [%v]: %v", filepath, err)
 		}
@@ -53,7 +53,7 @@ func parseFile(filepath string, s *Schema) (*Result, error) {
 	return &r, nil
 }
 
-func parse(query string, s *Schema) (*Query, error) {
+func parseQueryString(query string, s *Schema) (*Query, error) {
 	tree, err := sqlparser.Parse(query)
 
 	if err != nil {
@@ -63,20 +63,70 @@ func parse(query string, s *Schema) (*Query, error) {
 	switch tree := tree.(type) {
 	case *sqlparser.Select:
 		defaultTableName := getDefaultTable(tree)
-		res, err := parseQuery(tree, query, s, defaultTableName)
+		res, err := parseSelect(tree, query, s, defaultTableName)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse query: %v", err)
+			return nil, fmt.Errorf("Failed to parse SELECT query: %v", err)
 		}
 		return res, nil
-	case *sqlparser.Insert, *sqlparser.Update:
+	case *sqlparser.Insert:
+		insert, err := parseInsert(tree, query, s)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse INSERT query: %v", err)
+		}
+		return insert, nil
+	case *sqlparser.Update:
+
 	case *sqlparser.DDL:
 		s.Add(tree)
 		return nil, nil
+	default:
+		panic("Unsupported SQL statement type")
+		// return &Query{}, nil
 	}
-	return nil, fmt.Errorf("Failed to parse query statement: ")
+	return nil, fmt.Errorf("Failed to parse query statement: %v", query)
 }
 
-func getDefaultTable(node sqlparser.SQLNode) string {
+func (q *Query) parseNameAndCmd() error {
+	_, comments := sqlparser.SplitMarginComments(q.SQL)
+	err := q.parseLeadingComment(comments.Leading)
+	if err != nil {
+		return fmt.Errorf("Failed to parse leading comment %v", err)
+	}
+	return nil
+}
+
+func parseSelect(tree *sqlparser.Select, query string, s *Schema, defaultTableName string) (*Query, error) {
+	parsedQuery := Query{
+		SQL:              query,
+		defaultTableName: defaultTableName,
+		schemaLookup:     s,
+	}
+	err := sqlparser.Walk(parsedQuery.visit, tree)
+	if err != nil {
+		return nil, err
+	}
+
+	var paramWalker ParamSearcher
+	err = sqlparser.Walk(paramWalker.selectParamVisitor, tree)
+	if err != nil {
+		return nil, err
+	}
+
+	err = paramWalker.fillParamTypes(s, defaultTableName)
+	if err != nil {
+		return nil, err
+	}
+	parsedQuery.Params = paramWalker.params
+
+	err = parsedQuery.parseNameAndCmd()
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsedQuery, nil
+}
+
+func getDefaultTable(node *sqlparser.Select) string {
 	var tableName string
 	visit := func(node sqlparser.SQLNode) (bool, error) {
 		switch v := node.(type) {
@@ -92,41 +142,44 @@ func getDefaultTable(node sqlparser.SQLNode) string {
 	return tableName
 }
 
-// TODO: better solution for this replacement
-// func replaceWithQuestionMarks(tree sqlparser.Statement, numParams int) sqlparser.Expr {
+func parseInsert(node *sqlparser.Insert, query string, s *Schema) (*Query, error) {
+	cols := node.Columns
+	tableName := node.Table.Name.String()
+	rows, ok := node.Rows.(sqlparser.Values)
+	if !ok {
+		return nil, fmt.Errorf("Unknown insert row type of %T", node.Rows)
+	}
 
-func parseQuery(tree sqlparser.Statement, query string, s *Schema, defaultTableName string) (*Query, error) {
-	parsedQuery := Query{
-		// TODO: this query should have the :v1 params converted to ? params
+	params := []*Param{}
+
+	for _, row := range rows {
+		for colIx, item := range row {
+			switch v := item.(type) {
+			case *sqlparser.SQLVal:
+				if v.Type == sqlparser.ValArg {
+					colName := cols[colIx].String()
+					colDfn, _ := s.schemaLookup(tableName, colName)
+					p := &Param{
+						originalName: string(v.Val),
+						target:       cols[colIx],
+						typ:          goTypeCol(&colDfn.Type),
+					}
+					params = append(params, p)
+				}
+			default:
+				panic("Error occurred in parsing INSERT statement")
+			}
+		}
+	}
+	parsedQuery := &Query{
 		SQL:              query,
-		defaultTableName: defaultTableName,
+		Params:           params,
+		Columns:          nil,
+		defaultTableName: tableName,
 		schemaLookup:     s,
 	}
-
-	err := sqlparser.Walk(parsedQuery.visit, tree)
-	if err != nil {
-		return nil, err
-	}
-
-	var paramWalker ParamSearcher
-	err = sqlparser.Walk(paramWalker.paramVisitor, tree)
-	if err != nil {
-		return nil, err
-	}
-	parsedQuery.SQL = sqlparser.String(tree)
-
-	err = paramWalker.fillParamTypes(s, defaultTableName)
-	if err != nil {
-		return nil, err
-	}
-	parsedQuery.Params = paramWalker.params
-
-	_, comments := sqlparser.SplitMarginComments(query)
-	err = parsedQuery.parseLeadingComment(comments.Leading)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse leading comment %v", err)
-	}
-	return &parsedQuery, nil
+	parsedQuery.parseNameAndCmd()
+	return parsedQuery, nil
 }
 
 func (q *Query) parseLeadingComment(comment string) error {
@@ -160,7 +213,7 @@ func (q *Query) parseLeadingComment(comment string) error {
 func (q *Query) visit(node sqlparser.SQLNode) (bool, error) {
 	switch v := node.(type) {
 	case *sqlparser.AliasedExpr:
-		err := sqlparser.Walk(q.visitSelect, v)
+		err := sqlparser.Walk(q.visitColNames, v)
 		if err != nil {
 			return false, err
 		}
@@ -170,7 +223,7 @@ func (q *Query) visit(node sqlparser.SQLNode) (bool, error) {
 	return true, nil
 }
 
-func (q *Query) visitSelect(node sqlparser.SQLNode) (bool, error) {
+func (q *Query) visitColNames(node sqlparser.SQLNode) (bool, error) {
 	switch v := node.(type) {
 	case *sqlparser.ColName:
 		colTyp, err := q.schemaLookup.getColType(v, q.defaultTableName)
@@ -180,52 +233,6 @@ func (q *Query) visitSelect(node sqlparser.SQLNode) (bool, error) {
 		q.Columns = append(q.Columns, colTyp)
 	}
 	return true, nil
-}
-
-// NewSchema gives a newly instantiated MySQL schema map
-func NewSchema() *Schema {
-	return &Schema{
-		tables: make(map[string]([]*sqlparser.ColumnDefinition)),
-	}
-}
-
-// Schema proves that information for mapping columns in queries to their respective table definitions
-// and validating that they are correct so as to map to the correct Go type
-type Schema struct {
-	tables map[string]([]*sqlparser.ColumnDefinition)
-}
-
-func (s *Schema) getColType(node sqlparser.SQLNode, defaultTableName string) (*sqlparser.ColumnDefinition, error) {
-	col, ok := node.(*sqlparser.ColName)
-	if !ok {
-		return nil, fmt.Errorf("Attempted to determine the type of a non-column node")
-	}
-	// colName := col.Name.String()
-	if !col.Qualifier.IsEmpty() {
-		return s.schemaLookup(col.Qualifier.Name.String(), col.Name.String())
-	}
-	return s.schemaLookup(defaultTableName, col.Name.String())
-}
-
-// Add add a MySQL table definition to the schema map
-func (s *Schema) Add(table *sqlparser.DDL) {
-	name := table.Table.Name.String()
-	s.tables[name] = table.TableSpec.Columns
-}
-
-func (s *Schema) schemaLookup(table string, col string) (*sqlparser.ColumnDefinition, error) {
-	cols, ok := s.tables[table]
-	if !ok {
-		return nil, fmt.Errorf("Table [%v] not found in Schema", table)
-	}
-
-	for _, colDef := range cols {
-		if colDef.Name.EqualString(col) {
-			return colDef, nil
-		}
-	}
-
-	return nil, fmt.Errorf("Column [%v] not found in table [%v]", col, table)
 }
 
 func GeneratePkg(filepath string, settings dinosql.GenerateSettings, pkg dinosql.PackageSettings) (map[string]string, error) {
