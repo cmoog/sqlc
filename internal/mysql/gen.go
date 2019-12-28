@@ -22,21 +22,43 @@ func (r *Result) GetConfig() *dinosql.Config {
 	return r.Config
 }
 
-// Imports generates an import map
-// TODO: implement
-func (r *Result) Imports(packageSettings dinosql.PackageSettings) func(string) [][]string {
-	lookup := func(v string) [][]string {
-		var cols [][]string
-		return cols
-	}
-	return lookup
-}
-
 // Enums generates parser-agnostic GoEnum types
 // TODO: implement
 func (r *Result) Enums() []dinosql.GoEnum {
 	var enums []dinosql.GoEnum
+	for _, table := range r.Schema.tables {
+		for _, col := range table {
+			if col.Type.Type == "enum" {
+				constants := []dinosql.GoConstant{}
+				enumName := enumNameFromColDef(col)
+				for _, c := range col.Type.EnumValues {
+					stripped := stripInnerQuotes(c)
+					constants = append(constants, dinosql.GoConstant{
+						// TODO: maybe add the struct name call to capitalize the name here
+						Name:  stripped,
+						Value: stripped,
+						Type:  enumName,
+					})
+				}
+
+				goEnum := dinosql.GoEnum{
+					Name:      enumName,
+					Comment:   "",
+					Constants: constants,
+				}
+				enums = append(enums, goEnum)
+			}
+		}
+	}
 	return enums
+}
+
+func stripInnerQuotes(identifier string) string {
+	return strings.Replace(identifier, "'", "", 2)
+}
+
+func enumNameFromColDef(col *sqlparser.ColumnDefinition) string {
+	return fmt.Sprintf("%sEnum", col.Name.String())
 }
 
 // Structs marshels each query into a go struct for generation
@@ -50,7 +72,7 @@ func (r *Result) Structs() []dinosql.GoStruct {
 		for _, col := range cols {
 			s.Fields = append(s.Fields, dinosql.GoField{
 				Name:    dinosql.StructName(r, col.Name.String()),
-				Type:    goTypeCol(&col.Type),
+				Type:    goTypeCol(col),
 				Tags:    map[string]string{"json": col.Name.String()},
 				Comment: "",
 			})
@@ -91,22 +113,22 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 			p := query.Params[0]
 			gq.Arg = dinosql.GoQueryValue{
 				Name: p.Name(),
-				Typ:  p.GoType(),
+				Typ:  p.typ,
 			}
 		} else if len(query.Params) > 1 {
 
-			// needs conversion into a slice of interaces
-			// although this is dirty, it is needed for the current implementation of columnsToStruct
-			// where the first param uses the Structable interface
-			structableSlice := make([]Structable, len(query.Params))
+			structInfo := make([]structParams, len(query.Params))
 			for i := range query.Params {
-				structableSlice[i] = query.Params[i]
+				structInfo[i] = structParams{
+					originalName: query.Params[i].Name(),
+					goType:       query.Params[i].typ,
+				}
 			}
 
 			gq.Arg = dinosql.GoQueryValue{
 				Emit:   true,
 				Name:   "arg",
-				Struct: r.columnsToStruct(gq.MethodName+"Params", structableSlice),
+				Struct: r.columnsToStruct(gq.MethodName+"Params", structInfo),
 			}
 		}
 
@@ -114,7 +136,7 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 			c := query.Columns[0]
 			gq.Ret = dinosql.GoQueryValue{
 				Name: columnName(c, 0),
-				Typ:  goTypeCol(&c.Type),
+				Typ:  goTypeCol(c),
 			}
 		} else if len(query.Columns) > 1 {
 			var gs *dinosql.GoStruct
@@ -128,7 +150,7 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 				for i, f := range s.Fields {
 					c := query.Columns[i]
 					sameName := f.Name == dinosql.StructName(r, columnName(c, i))
-					sameType := f.Type == goTypeCol(&c.Type)
+					sameType := f.Type == goTypeCol(c)
 					// TODO: consider making this deep equality from stdlib?
 					// sameFQN := s.Table.EqualTo(&c.Table)
 					if !sameName || !sameType || true { // !sameFQN
@@ -142,14 +164,14 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 			}
 
 			if gs == nil {
-				// needs conversion into a slice of interaces
-				// although this is dirty, it is needed for the current implementation of columnsToStruct
-				// where the first param uses the Structable interface
-				structableSlice := make([]Structable, len(query.Columns))
+				structInfo := make([]structParams, len(query.Columns))
 				for i := range query.Columns {
-					structableSlice[i] = columnDfnAlias(*query.Columns[i])
+					structInfo[i] = structParams{
+						originalName: query.Columns[i].Name.String(),
+						goType:       goTypeCol(query.Columns[i]),
+					}
 				}
-				gs = r.columnsToStruct(gq.MethodName+"Row", structableSlice)
+				gs = r.columnsToStruct(gq.MethodName+"Row", structInfo)
 				emit = true
 			}
 			gq.Ret = dinosql.GoQueryValue{
@@ -165,27 +187,19 @@ func (r *Result) GoQueries() []dinosql.GoQuery {
 	return qs
 }
 
-type Structable interface {
-	OriginalString() string
-	GoType() string
-}
-type columnDfnAlias sqlparser.ColumnDefinition
-
-func (col columnDfnAlias) GoType() string {
-	return goTypeCol(&col.Type)
-}
-func (col columnDfnAlias) OriginalString() string {
-	return col.Name.String()
+type structParams struct {
+	originalName string
+	goType       string
 }
 
-func (r *Result) columnsToStruct(name string, items []Structable) *dinosql.GoStruct {
+func (r *Result) columnsToStruct(name string, items []structParams) *dinosql.GoStruct {
 	gs := dinosql.GoStruct{
 		Name: name,
 	}
 	seen := map[string]int{}
 	for _, item := range items {
-		name := item.OriginalString()
-		typ := item.GoType()
+		name := item.originalName
+		typ := item.goType
 		tagName := name
 		fieldName := dinosql.StructName(r, name)
 		if v := seen[name]; v > 0 {
@@ -202,23 +216,26 @@ func (r *Result) columnsToStruct(name string, items []Structable) *dinosql.GoStr
 	return &gs
 }
 
-func goTypeCol(col *sqlparser.ColumnType) string {
-	switch t := col.Type; {
+func goTypeCol(col *sqlparser.ColumnDefinition) string {
+	switch t := col.Type.Type; {
 	case "varchar" == t:
-		if col.NotNull {
+		if col.Type.NotNull {
 			return "string"
 		}
 		return "sql.NullString"
 	case "int" == t:
-		if col.NotNull {
+		if col.Type.NotNull {
 			return "int"
 		}
 		return "sql.NullInt64"
 	case "float" == t, strings.HasPrefix(strings.ToLower(t), "decimal"):
-		if col.NotNull {
+		if col.Type.NotNull {
 			return "float64"
 		}
 		return "sql.NullFloat64"
+	case "enum" == t:
+		// enum := fmt.Sprintf("%sType",  // dinosql.StructName(r, col.Name.String()))
+		return enumNameFromColDef(col)
 	default:
 		// TODO: remove panic here
 		panic(fmt.Sprintf("Handle this col type directly: %v\n", col.Type))

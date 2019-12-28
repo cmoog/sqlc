@@ -2,13 +2,9 @@ CREATE TABLE students (
   id int NOT NULL,
   school_id VARCHAR(255) NOT NULL,
   school_lat FLOAT,
+  department ENUM("English", "Math"),
   PRIMARY KEY (ID)
 );
-
-CREATE TABLE teachers ( 
-  id int NOT NULL,
-  school_id VARCHAR(255) NOT NULL
-)
 
 /* name: GetAllStudents :many */
 SELECT school_id, id FROM students WHERE id = ? AND school_id = ?
