@@ -162,7 +162,7 @@ func parseInsert(node *sqlparser.Insert, query string, s *Schema) (*Query, error
 					p := &Param{
 						originalName: string(v.Val),
 						target:       cols[colIx],
-						typ:          goTypeCol(&colDfn.Type),
+						typ:          goTypeCol(colDfn),
 					}
 					params = append(params, p)
 				}

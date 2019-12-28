@@ -58,7 +58,7 @@ func (p *ParamSearcher) fillParamTypes(s *Schema, defaultTableName string) error
 			if err != nil {
 				return err
 			}
-			param.typ = goTypeCol(&colDfn.Type)
+			param.typ = goTypeCol(colDfn)
 
 		case *sqlparser.Limit:
 			param.typ = "uint32"
@@ -92,12 +92,4 @@ func (p Param) Name() string {
 	}
 	num := string(original[2])
 	return fmt.Sprintf("param%v", num)
-}
-
-func (p *Param) OriginalString() string {
-	return p.Name()
-}
-
-func (p *Param) GoType() string {
-	return p.typ
 }
