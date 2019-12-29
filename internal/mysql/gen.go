@@ -56,7 +56,7 @@ func stripInnerQuotes(identifier string) string {
 }
 
 func enumNameFromColDef(col *sqlparser.ColumnDefinition, settings dinosql.GenerateSettings) string {
-	return fmt.Sprintf("%sEnum",
+	return fmt.Sprintf("%sType",
 		dinosql.StructName(col.Name.String(), settings))
 }
 
@@ -233,7 +233,7 @@ func goTypeCol(col *sqlparser.ColumnDefinition, settings dinosql.GenerateSetting
 		}
 		return "sql.NullFloat64"
 	case "enum" == t:
-		return fmt.Sprintf("%sType", dinosql.StructName(col.Name.String(), settings))
+		return enumNameFromColDef(col, settings)
 	default:
 		// TODO: remove panic here
 		panic(fmt.Sprintf("Handle this col type directly: %v\n", col.Type))
