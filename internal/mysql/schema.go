@@ -19,12 +19,7 @@ type Schema struct {
 	tables map[string]([]*sqlparser.ColumnDefinition)
 }
 
-func (s *Schema) getColType(node sqlparser.SQLNode, defaultTableName string) (*sqlparser.ColumnDefinition, error) {
-	col, ok := node.(*sqlparser.ColName)
-	if !ok {
-		return nil, fmt.Errorf("Attempted to determine the type of a non-column node")
-	}
-	// colName := col.Name.String()
+func (s *Schema) getColType(col *sqlparser.ColName, defaultTableName string) (*sqlparser.ColumnDefinition, error) {
 	if !col.Qualifier.IsEmpty() {
 		return s.schemaLookup(col.Qualifier.Name.String(), col.Name.String())
 	}

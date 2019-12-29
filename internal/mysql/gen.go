@@ -111,7 +111,7 @@ func (r *Result) GoQueries(settings dinosql.GenerateSettings) []dinosql.GoQuery 
 		if len(query.Params) == 1 {
 			p := query.Params[0]
 			gq.Arg = dinosql.GoQueryValue{
-				Name: p.Name(),
+				Name: p.name,
 				Typ:  p.typ,
 			}
 		} else if len(query.Params) > 1 {
@@ -119,7 +119,7 @@ func (r *Result) GoQueries(settings dinosql.GenerateSettings) []dinosql.GoQuery 
 			structInfo := make([]structParams, len(query.Params))
 			for i := range query.Params {
 				structInfo[i] = structParams{
-					originalName: query.Params[i].Name(),
+					originalName: query.Params[i].name,
 					goType:       query.Params[i].typ,
 				}
 			}
