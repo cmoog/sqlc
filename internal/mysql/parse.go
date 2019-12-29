@@ -63,7 +63,7 @@ func parseQueryString(query string, s *Schema, settings dinosql.GenerateSettings
 
 	switch tree := tree.(type) {
 	case *sqlparser.Select:
-		defaultTableName := getDefaultTable(tree)
+		defaultTableName := getDefaultTable(&tree.From)
 		res, err := parseSelect(tree, query, s, defaultTableName, settings)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to parse SELECT query: %v", err)
@@ -114,7 +114,7 @@ func parseSelect(tree *sqlparser.Select, query string, s *Schema, defaultTableNa
 		return nil, err
 	}
 
-	whereParams, err := paramsInWhereExpr(tree.Where.Expr, s, defaultTableName, settings)
+	whereParams, err := paramsInWhereExpr(tree.Where, s, defaultTableName, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,8 @@ func parseSelect(tree *sqlparser.Select, query string, s *Schema, defaultTableNa
 	return &parsedQuery, nil
 }
 
-func getDefaultTable(node *sqlparser.Select) string {
+func getDefaultTable(node *sqlparser.TableExprs) string {
+	// TODO: improve this
 	var tableName string
 	visit := func(node sqlparser.SQLNode) (bool, error) {
 		switch v := node.(type) {
@@ -150,7 +151,8 @@ func getDefaultTable(node *sqlparser.Select) string {
 }
 
 func parseUpdate(node *sqlparser.Update, query string, s *Schema, settings dinosql.GenerateSettings) (*Query, error) {
-	defaultTable := "users"
+	defaultTable := getDefaultTable(&node.TableExprs)
+
 	params := []*Param{}
 	for _, updateExpr := range node.Exprs {
 		col := updateExpr.Name
