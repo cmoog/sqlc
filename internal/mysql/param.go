@@ -27,7 +27,7 @@ func paramsInLimitExpr(limit *sqlparser.Limit, s *Schema, settings dinosql.Gener
 				params = append(params, &Param{
 					originalName: string(v.Val),
 					name:         "limit",
-					typ:          "int",
+					typ:          "uint32",
 				})
 			}
 		}
@@ -39,9 +39,14 @@ func paramsInLimitExpr(limit *sqlparser.Limit, s *Schema, settings dinosql.Gener
 	return params, nil
 }
 
-func paramsInWhereExpr(e sqlparser.Expr, s *Schema, defaultTable string, settings dinosql.GenerateSettings) ([]*Param, error) {
+func paramsInWhereExpr(e sqlparser.SQLNode, s *Schema, defaultTable string, settings dinosql.GenerateSettings) ([]*Param, error) {
 	params := []*Param{}
 	switch v := e.(type) {
+	case *sqlparser.Where:
+		if v == nil {
+			return params, nil
+		}
+		return paramsInWhereExpr(v.Expr, s, defaultTable, settings)
 	case *sqlparser.ComparisonExpr:
 		p, found, err := paramInComparison(v, s, defaultTable, settings)
 		if err != nil {
