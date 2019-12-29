@@ -98,7 +98,7 @@ func TestSelectParamSearcher(t *testing.T) {
 		}
 
 		// TODO: get this out of the unit test and/or deprecate defaultTable
-		defaultTable := getDefaultTable(selectStm)
+		defaultTable := getDefaultTable(&selectStm.From)
 		keep(defaultTable)
 
 		if !reflect.DeepEqual(params, tCase.output) {
