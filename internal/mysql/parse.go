@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -75,7 +76,11 @@ func parseQueryString(query string, s *Schema, settings dinosql.GenerateSettings
 		}
 		return insert, nil
 	case *sqlparser.Update:
-
+		update, err := parseUpdate(tree, query, s, settings)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse UPDATE query: %v", err)
+		}
+		return update, nil
 	case *sqlparser.DDL:
 		s.Add(tree)
 		return nil, nil
@@ -87,6 +92,9 @@ func parseQueryString(query string, s *Schema, settings dinosql.GenerateSettings
 }
 
 func (q *Query) parseNameAndCmd() error {
+	if q == nil {
+		return errors.New("Cannot parse name and cmd from null query")
+	}
 	_, comments := sqlparser.SplitMarginComments(q.SQL)
 	err := q.parseLeadingComment(comments.Leading)
 	if err != nil {
@@ -106,17 +114,16 @@ func parseSelect(tree *sqlparser.Select, query string, s *Schema, defaultTableNa
 		return nil, err
 	}
 
-	var paramWalker ParamSearcher
-	err = sqlparser.Walk(paramWalker.selectParamVisitor, tree)
+	whereParams, err := paramsInWhereExpr(tree.Where.Expr, s, defaultTableName, settings)
 	if err != nil {
 		return nil, err
 	}
 
-	err = paramWalker.fillParamTypes(s, defaultTableName, settings)
+	limitParams, err := paramsInLimitExpr(tree.Limit, s, settings)
 	if err != nil {
 		return nil, err
 	}
-	parsedQuery.Params = paramWalker.params
+	parsedQuery.Params = append(whereParams, limitParams...)
 
 	err = parsedQuery.parseNameAndCmd()
 	if err != nil {
@@ -142,6 +149,45 @@ func getDefaultTable(node *sqlparser.Select) string {
 	return tableName
 }
 
+func parseUpdate(node *sqlparser.Update, query string, s *Schema, settings dinosql.GenerateSettings) (*Query, error) {
+	defaultTable := "users"
+	params := []*Param{}
+	for _, updateExpr := range node.Exprs {
+		col := updateExpr.Name
+		newValue, isParam := updateExpr.Expr.(*sqlparser.SQLVal)
+		if !isParam {
+			continue
+		}
+		colDfn, err := s.getColType(col, defaultTable)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to determine type of a parameter's column: %v", err)
+		}
+		originalParamName := string(newValue.Val)
+		param := Param{
+			originalName: originalParamName,
+			name:         paramName(colDfn.Name, originalParamName),
+			typ:          goTypeCol(colDfn, settings),
+		}
+		params = append(params, &param)
+	}
+
+	whereParams, err := paramsInWhereExpr(node.Where.Expr, s, defaultTable, settings)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse params from WHERE expression: %v", err)
+	}
+
+	parsedQuery := Query{
+		SQL:              query,
+		Columns:          nil,
+		Params:           append(params, whereParams...),
+		defaultTableName: defaultTable,
+		schemaLookup:     s,
+	}
+	parsedQuery.parseNameAndCmd()
+
+	return &parsedQuery, nil
+}
+
 func parseInsert(node *sqlparser.Insert, query string, s *Schema, settings dinosql.GenerateSettings) (*Query, error) {
 	cols := node.Columns
 	tableName := node.Table.Name.String()
@@ -159,9 +205,10 @@ func parseInsert(node *sqlparser.Insert, query string, s *Schema, settings dinos
 				if v.Type == sqlparser.ValArg {
 					colName := cols[colIx].String()
 					colDfn, _ := s.schemaLookup(tableName, colName)
+					varName := string(v.Val)
 					p := &Param{
-						originalName: string(v.Val),
-						target:       cols[colIx],
+						originalName: varName,
+						name:         paramName(colDfn.Name, varName),
 						typ:          goTypeCol(colDfn, settings),
 					}
 					params = append(params, p)

@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -74,14 +73,6 @@ func TestGenerate(t *testing.T) {
 	// 	fmt.Println(v)
 	// 	fmt.Println("")
 	// }
-}
-
-func TestParamType(t *testing.T) {
-	s := NewSchema()
-	result, _ := parseFile(filename, "db", s, mockSettings)
-
-	p := result.Queries[0].Params[0]
-	keep(fmt.Sprintf("%v", p))
 }
 
 func keep(interface{}) {}
@@ -192,11 +183,8 @@ func TestParseSelect(t *testing.T) {
 				Params: []*Param{
 					&Param{
 						originalName: ":v1",
-						target: &sqlparser.ColName{
-							Name:      sqlparser.NewColIdent("id"),
-							Qualifier: sqlparser.TableName{},
-						},
-						typ: "int",
+						name:         "id",
+						typ:          "int",
 					}},
 				Name:             "GetNameByID",
 				Cmd:              ":one",
@@ -218,7 +206,7 @@ func TestParseSelect(t *testing.T) {
 		}
 		if !reflect.DeepEqual(testCase.output, q) {
 			t.Errorf("Parsing query returned differently than expected.")
-			t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
+			// t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
 		}
 	}
 }
@@ -277,6 +265,8 @@ func TestParseInsert(t *testing.T) {
 	}
 	query1 := `/* name: InsertNewUser :exec */
 	INSERT INTO users (first_name, last_name) VALUES (?, ?)`
+	query2 := `/* name: UpdateUserAt :exec */
+	UPDATE students SET first_name = ?, last_name = ? WHERE id > ? AND first_name = ? LIMIT 3`
 	tests := []testCase{
 		testCase{
 			input: expected{
@@ -289,16 +279,52 @@ func TestParseInsert(t *testing.T) {
 				Params: []*Param{
 					&Param{
 						originalName: ":v1",
-						target:       sqlparser.NewColIdent("first_name"),
+						name:         "first_name",
 						typ:          "string",
 					},
 					&Param{
 						originalName: ":v2",
-						target:       sqlparser.NewColIdent("last_name"),
+						name:         "last_name",
 						typ:          "sql.NullString",
 					},
 				},
 				Name:             "InsertNewUser",
+				Cmd:              ":exec",
+				defaultTableName: "users",
+				schemaLookup:     mockSchema,
+			},
+		},
+		testCase{
+			input: expected{
+				query:  query2,
+				schema: mockSchema,
+			},
+			output: &Query{
+				SQL:     query2,
+				Columns: nil,
+				Params: []*Param{
+					&Param{
+						originalName: ":v1",
+						name:         "first_name",
+						typ:          "string",
+					},
+					&Param{
+						originalName: ":v2",
+						name:         "last_name",
+						typ:          "sql.NullString",
+					},
+					&Param{
+						originalName: ":v3",
+						name:         "id",
+						typ:          "int",
+					},
+					&Param{
+						originalName: ":v4",
+						name:         "first_name",
+						typ:          "string",
+					},
+				},
+				Name:             "UpdateUserAt",
 				Cmd:              ":exec",
 				defaultTableName: "users",
 				schemaLookup:     mockSchema,
@@ -309,15 +335,18 @@ func TestParseInsert(t *testing.T) {
 	for _, testCase := range tests {
 		q, err := parseQueryString(testCase.input.query, testCase.input.schema, mockSettings)
 		if err != nil {
-			t.Errorf("Parsing failed withe query: [%v]\n:schema: %v", query, spew.Sdump(testCase.input.schema))
+			t.Errorf("Parsing failed with query: [%v]\n", testCase.input.query)
+			continue
 		}
 
 		err = q.parseNameAndCmd()
 		if err != nil {
-			t.Errorf("Parsing failed withe query: [%v]\n:schema: %v", query, spew.Sdump(testCase.input.schema))
+			t.Errorf("Parsing failed withe query: [%v]\n", query)
 		}
 		if !reflect.DeepEqual(testCase.output, q) {
 			t.Errorf("Parsing query returned differently than expected.")
+			testCase.output.schemaLookup = nil
+			q.schemaLookup = nil
 			t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
 		}
 	}
