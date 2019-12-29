@@ -8,6 +8,7 @@ import (
 )
 
 func TestColumnsToStruct(t *testing.T) {
+	pkgName := "db"
 	cols := []pg.Column{
 		{
 			Name:     "other",
@@ -53,7 +54,7 @@ func TestColumnsToStruct(t *testing.T) {
 	}
 
 	r := Result{
-		Config: NewConfig(),
+		packageName: pkgName,
 	}
 
 	// set up column-based override test
@@ -69,12 +70,11 @@ func TestColumnsToStruct(t *testing.T) {
 		Column: "foo.languages",
 	}
 	oa.Parse()
+	// pkgConfig := PackageSettings{
+	// 	Overrides: []Override{o, oa},
+	// }
 
-	r.GetConfig().PackageSettings = PackageSettings{
-		Overrides: []Override{o, oa},
-	}
-
-	actual := r.columnsToStruct("Foo", cols)
+	actual := r.columnsToStruct("Foo", cols, mockSettings)
 	expected := &GoStruct{
 		Name: "Foo",
 		Fields: []GoField{
@@ -92,10 +92,23 @@ func TestColumnsToStruct(t *testing.T) {
 	}
 }
 
-func TestInnerType(t *testing.T) {
-	r := Result{
-		Config: NewConfig(),
+var mockSettings GenerateSettings
+
+func init() {
+	mockSettings = GenerateSettings{
+		Version: "1",
+		Packages: []PackageSettings{
+			PackageSettings{
+				Name: "db",
+			},
+		},
+		Overrides: []Override{},
 	}
+	mockSettings.PopulatePkgMap()
+}
+
+func TestInnerType(t *testing.T) {
+	r := Result{}
 	types := map[string]string{
 		"integer":         "int32",
 		"int":             "int32",
@@ -114,17 +127,15 @@ func TestInnerType(t *testing.T) {
 		goType := v
 		t.Run(k+"-"+v, func(t *testing.T) {
 			col := pg.Column{DataType: dbType, NotNull: true}
-			if goType != r.goType(col) {
-				t.Errorf("expected Go type for %s to be %s, not %s", dbType, goType, r.goType(col))
+			if goType != r.goType(col, mockSettings) {
+				t.Errorf("expected Go type for %s to be %s, not %s", dbType, goType, r.goType(col, mockSettings))
 			}
 		})
 	}
 }
 
 func TestNullInnerType(t *testing.T) {
-	r := Result{
-		Config: NewConfig(),
-	}
+	r := Result{}
 	types := map[string]string{
 		"integer":         "sql.NullInt32",
 		"int":             "sql.NullInt32",
@@ -143,8 +154,8 @@ func TestNullInnerType(t *testing.T) {
 		goType := v
 		t.Run(k+"-"+v, func(t *testing.T) {
 			col := pg.Column{DataType: dbType, NotNull: false}
-			if goType != r.goType(col) {
-				t.Errorf("expected Go type for %s to be %s, not %s", dbType, goType, r.goType(col))
+			if goType != r.goType(col, mockSettings) {
+				t.Errorf("expected Go type for %s to be %s, not %s", dbType, goType, r.goType(col, mockSettings))
 			}
 		})
 	}

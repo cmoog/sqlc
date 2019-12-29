@@ -115,7 +115,7 @@ func TestSelectParamSearcher(t *testing.T) {
 
 		// TODO: get this out of the unit test and/or deprecate defaultTable
 		defaultTable := getDefaultTable(selectStm)
-		err = searcher.fillParamTypes(mockSchema, defaultTable)
+		err = searcher.fillParamTypes(mockSchema, defaultTable, mockSettings)
 
 		if !reflect.DeepEqual(searcher.params, tCase.output) {
 			t.Errorf("Param searcher returned unexpected result\nResult: %v\nExpected: %v",
@@ -167,7 +167,7 @@ func TestInsertParamSearcher(t *testing.T) {
 		if !ok {
 			t.Errorf("Test case is not SELECT statement as expected")
 		}
-		result, err := parseInsert(insertStm, tCase.input, mockSchema)
+		result, err := parseInsert(insertStm, tCase.input, mockSchema, mockSettings)
 		if err != nil {
 			t.Errorf("Failed to parse insert statement.")
 		}

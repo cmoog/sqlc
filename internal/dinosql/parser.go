@@ -171,32 +171,32 @@ type Query struct {
 }
 
 type Result struct {
-	Queries []*Query
-	Catalog core.Catalog
-	Config  *Config
+	Queries     []*Query
+	Catalog     core.Catalog
+	packageName string
 }
 
-func (r Result) GetConfig() *Config {
-	return r.Config
+func (r Result) PkgName() string {
+	return r.packageName
 }
 
-func ParseQueries(c core.Catalog, settings GenerateSettings, pkg PackageSettings) (*Result, error) {
-	f, err := os.Stat(pkg.Queries)
+func ParseQueries(c core.Catalog, pkgConfig PackageSettings) (*Result, error) {
+	f, err := os.Stat(pkgConfig.Queries)
 	if err != nil {
-		return nil, fmt.Errorf("path %s does not exist", pkg.Queries)
+		return nil, fmt.Errorf("path %s does not exist", pkgConfig.Queries)
 	}
 
 	var files []string
 	if f.IsDir() {
-		listing, err := ioutil.ReadDir(pkg.Queries)
+		listing, err := ioutil.ReadDir(pkgConfig.Queries)
 		if err != nil {
 			return nil, err
 		}
 		for _, f := range listing {
-			files = append(files, filepath.Join(pkg.Queries, f.Name()))
+			files = append(files, filepath.Join(pkgConfig.Queries, f.Name()))
 		}
 	} else {
-		files = append(files, pkg.Queries)
+		files = append(files, pkgConfig.Queries)
 	}
 
 	merr := NewParserErr()
@@ -246,9 +246,13 @@ func ParseQueries(c core.Catalog, settings GenerateSettings, pkg PackageSettings
 		return nil, merr
 	}
 	if len(q) == 0 {
-		return nil, fmt.Errorf("path %s contains no queries", pkg.Queries)
+		return nil, fmt.Errorf("path %s contains no queries", pkgConfig.Queries)
 	}
-	return &Result{Catalog: c, Queries: q, Config: &Config{Settings: settings}}, nil
+	return &Result{
+		Catalog:     c,
+		Queries:     q,
+		packageName: pkgConfig.Name,
+	}, nil
 }
 
 func location(node nodes.Node) int {

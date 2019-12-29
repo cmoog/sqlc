@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kyleconroy/sqlc/internal/dinosql"
 	"vitess.io/vitess/go/vt/sqlparser"
 )
 
@@ -50,7 +51,7 @@ func (p *ParamSearcher) selectParamVisitor(node sqlparser.SQLNode) (bool, error)
 	return true, nil
 }
 
-func (p *ParamSearcher) fillParamTypes(s *Schema, defaultTableName string) error {
+func (p *ParamSearcher) fillParamTypes(s *Schema, defaultTableName string, settings dinosql.GenerateSettings) error {
 	for _, param := range p.params {
 		switch target := param.target.(type) {
 		case *sqlparser.ColName:
@@ -58,7 +59,7 @@ func (p *ParamSearcher) fillParamTypes(s *Schema, defaultTableName string) error
 			if err != nil {
 				return err
 			}
-			param.typ = goTypeCol(colDfn)
+			param.typ = goTypeCol(colDfn, settings)
 
 		case *sqlparser.Limit:
 			param.typ = "uint32"
