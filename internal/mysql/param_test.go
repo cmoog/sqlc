@@ -10,9 +10,8 @@ import (
 
 func TestSelectParamSearcher(t *testing.T) {
 	type testCase struct {
-		input         string
-		output        []*Param
-		expectedNames []string
+		input  string
+		output []*Param
 	}
 
 	tests := []testCase{
@@ -20,10 +19,10 @@ func TestSelectParamSearcher(t *testing.T) {
 			input: "SELECT first_name, id, last_name FROM users WHERE id < ?",
 			output: []*Param{&Param{
 				originalName: ":v1",
+				name:         "id",
 				typ:          "int",
 			},
 			},
-			expectedNames: []string{"id"},
 		},
 		testCase{
 			input: `SELECT
@@ -34,45 +33,47 @@ func TestSelectParamSearcher(t *testing.T) {
 								orders
 							LEFT JOIN users ON orders.user_id = users.id
 							WHERE orders.price > :minPrice`,
-			output: []*Param{&Param{
-				originalName: ":minPrice",
-				typ:          "float64",
+			output: []*Param{
+				&Param{
+					originalName: ":minPrice",
+					name:         "minPrice",
+					typ:          "float64",
+				},
 			},
-			},
-			expectedNames: []string{"minPrice"},
 		},
 		testCase{
 			input: "SELECT first_name, id, last_name FROM users WHERE id = :targetID",
 			output: []*Param{&Param{
 				originalName: ":targetID",
+				name:         "targetID",
 				typ:          "int",
 			},
 			},
-			expectedNames: []string{"targetID"},
 		},
 		testCase{
 			input: "SELECT first_name, last_name FROM users WHERE age < :maxAge AND last_name = :inFamily",
 			output: []*Param{
 				&Param{
 					originalName: ":maxAge",
+					name:         "maxAge",
 					typ:          "int",
 				},
 				&Param{
 					originalName: ":inFamily",
+					name:         "inFamily",
 					typ:          "sql.NullString",
 				},
 			},
-			expectedNames: []string{"maxAge", "inFamily"},
 		},
 		testCase{
 			input: "SELECT first_name, last_name FROM users LIMIT ?",
 			output: []*Param{
 				&Param{
 					originalName: ":v1",
+					name:         "limit",
 					typ:          "uint32",
 				},
 			},
-			expectedNames: []string{"limit"},
 		},
 	}
 	for _, tCase := range tests {
@@ -81,6 +82,17 @@ func TestSelectParamSearcher(t *testing.T) {
 			t.Errorf("Failed to parse input query")
 		}
 		selectStm, ok := tree.(*sqlparser.Select)
+
+		limitParams, err := paramsInLimitExpr(selectStm.Limit, mockSchema, mockSettings)
+		if err != nil {
+			t.Errorf("Failed to parse limit expression params: %v", err)
+		}
+		whereParams, err := paramsInWhereExpr(selectStm.Where, mockSchema, "users", mockSettings)
+		if err != nil {
+			t.Errorf("Failed to parse where expression params: %v", err)
+		}
+
+		params := append(limitParams, whereParams...)
 		if !ok {
 			t.Errorf("Test case is not SELECT statement as expected")
 		}
@@ -89,19 +101,10 @@ func TestSelectParamSearcher(t *testing.T) {
 		defaultTable := getDefaultTable(selectStm)
 		keep(defaultTable)
 
-		// if !reflect.DeepEqual(searcher.params, tCase.output) {
-		// 	t.Errorf("Param searcher returned unexpected result\nResult: %v\nExpected: %v",
-		// 		spew.Sdump(searcher.params), spew.Sdump(tCase.output))
-		// }
-		// if len(searcher.params) != len(tCase.expectedNames) {
-		// 	t.Errorf("Insufficient test cases. Mismatch in length of expected param names and parsed params")
-		// }
-		// for ix, p := range searcher.params {
-		// 	if p.Name() != tCase.expectedNames[ix] {
-		// 		t.Errorf("Derived param does not match expected output.\nResult: %v\nExpected: %v",
-		// 			p.Name(), tCase.expectedNames[ix])
-		// 	}
-		// }
+		if !reflect.DeepEqual(params, tCase.output) {
+			t.Errorf("Param searcher returned unexpected result\nResult: %v\nExpected: %v",
+				spew.Sdump(params), spew.Sdump(tCase.output))
+		}
 	}
 }
 
