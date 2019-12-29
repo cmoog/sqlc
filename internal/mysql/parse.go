@@ -21,7 +21,7 @@ type Query struct {
 	schemaLookup     *Schema
 }
 
-func parseFile(filepath string, s *Schema) (*Result, error) {
+func parseFile(filepath string, inPkg string, s *Schema, settings dinosql.GenerateSettings) (*Result, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open file [%v]: %v", filepath, err)
@@ -35,7 +35,7 @@ func parseFile(filepath string, s *Schema) (*Result, error) {
 	parsedQueries := []*Query{}
 
 	for _, query := range rawQueries {
-		result, err := parseQueryString(query, s)
+		result, err := parseQueryString(query, s, settings)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to parse query in filepath [%v]: %v", filepath, err)
 		}
@@ -46,14 +46,14 @@ func parseFile(filepath string, s *Schema) (*Result, error) {
 	}
 
 	r := Result{
-		Queries: parsedQueries,
-		Schema:  s,
-		Config:  dinosql.NewConfig(),
+		Queries:     parsedQueries,
+		Schema:      s,
+		packageName: inPkg,
 	}
 	return &r, nil
 }
 
-func parseQueryString(query string, s *Schema) (*Query, error) {
+func parseQueryString(query string, s *Schema, settings dinosql.GenerateSettings) (*Query, error) {
 	tree, err := sqlparser.Parse(query)
 
 	if err != nil {
@@ -63,13 +63,13 @@ func parseQueryString(query string, s *Schema) (*Query, error) {
 	switch tree := tree.(type) {
 	case *sqlparser.Select:
 		defaultTableName := getDefaultTable(tree)
-		res, err := parseSelect(tree, query, s, defaultTableName)
+		res, err := parseSelect(tree, query, s, defaultTableName, settings)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to parse SELECT query: %v", err)
 		}
 		return res, nil
 	case *sqlparser.Insert:
-		insert, err := parseInsert(tree, query, s)
+		insert, err := parseInsert(tree, query, s, settings)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to parse INSERT query: %v", err)
 		}
@@ -95,7 +95,7 @@ func (q *Query) parseNameAndCmd() error {
 	return nil
 }
 
-func parseSelect(tree *sqlparser.Select, query string, s *Schema, defaultTableName string) (*Query, error) {
+func parseSelect(tree *sqlparser.Select, query string, s *Schema, defaultTableName string, settings dinosql.GenerateSettings) (*Query, error) {
 	parsedQuery := Query{
 		SQL:              query,
 		defaultTableName: defaultTableName,
@@ -112,7 +112,7 @@ func parseSelect(tree *sqlparser.Select, query string, s *Schema, defaultTableNa
 		return nil, err
 	}
 
-	err = paramWalker.fillParamTypes(s, defaultTableName)
+	err = paramWalker.fillParamTypes(s, defaultTableName, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func getDefaultTable(node *sqlparser.Select) string {
 	return tableName
 }
 
-func parseInsert(node *sqlparser.Insert, query string, s *Schema) (*Query, error) {
+func parseInsert(node *sqlparser.Insert, query string, s *Schema, settings dinosql.GenerateSettings) (*Query, error) {
 	cols := node.Columns
 	tableName := node.Table.Name.String()
 	rows, ok := node.Rows.(sqlparser.Values)
@@ -162,7 +162,7 @@ func parseInsert(node *sqlparser.Insert, query string, s *Schema) (*Query, error
 					p := &Param{
 						originalName: string(v.Val),
 						target:       cols[colIx],
-						typ:          goTypeCol(colDfn),
+						typ:          goTypeCol(colDfn, settings),
 					}
 					params = append(params, p)
 				}
@@ -235,13 +235,13 @@ func (q *Query) visitColNames(node sqlparser.SQLNode) (bool, error) {
 	return true, nil
 }
 
-func GeneratePkg(filepath string, settings dinosql.GenerateSettings, pkg dinosql.PackageSettings) (map[string]string, error) {
+func GeneratePkg(filepath string, settings dinosql.GenerateSettings) (map[string]string, error) {
 	s := NewSchema()
-	result, err := parseFile(filepath, s)
+	result, err := parseFile(filepath, "db", s, settings)
 	if err != nil {
 		return nil, err
 	}
-	output, err := dinosql.Generate(result, settings, pkg)
+	output, err := dinosql.Generate(result, settings)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to generate output: %v", err)
 	}

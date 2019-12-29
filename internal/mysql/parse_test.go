@@ -50,13 +50,21 @@ func TestParseFile(t *testing.T) {
 	// spew.Dump(p.GenerateQuery())
 }
 
+var mockSettings = dinosql.GenerateSettings{
+	Version: "1",
+	Packages: []dinosql.PackageSettings{
+		dinosql.PackageSettings{
+			Name: "db",
+		},
+	},
+	Overrides: []dinosql.Override{},
+}
+
 func TestGenerate(t *testing.T) {
 	// t.Skip()
 	s := NewSchema()
-	result, _ := parseFile(filename, s)
-	output, err := dinosql.Generate(result, dinosql.GenerateSettings{}, dinosql.PackageSettings{
-		Name: "db",
-	})
+	result, _ := parseFile(filename, "db", s, mockSettings)
+	output, err := dinosql.Generate(result, mockSettings)
 	if err != nil {
 		t.Errorf("Failed to generate output: %v", err)
 	}
@@ -70,7 +78,7 @@ func TestGenerate(t *testing.T) {
 
 func TestParamType(t *testing.T) {
 	s := NewSchema()
-	result, _ := parseFile(filename, s)
+	result, _ := parseFile(filename, "db", s, mockSettings)
 
 	p := result.Queries[0].Params[0]
 	keep(fmt.Sprintf("%v", p))
@@ -199,7 +207,7 @@ func TestParseSelect(t *testing.T) {
 	}
 
 	for _, testCase := range tests {
-		q, err := parseQueryString(testCase.input.query, testCase.input.schema)
+		q, err := parseQueryString(testCase.input.query, testCase.input.schema, mockSettings)
 		if err != nil {
 			t.Errorf("Parsing failed withe query: [%v]\n:schema: %v", query, spew.Sdump(testCase.input.schema))
 		}
@@ -299,7 +307,7 @@ func TestParseInsert(t *testing.T) {
 	}
 
 	for _, testCase := range tests {
-		q, err := parseQueryString(testCase.input.query, testCase.input.schema)
+		q, err := parseQueryString(testCase.input.query, testCase.input.schema, mockSettings)
 		if err != nil {
 			t.Errorf("Parsing failed withe query: [%v]\n:schema: %v", query, spew.Sdump(testCase.input.schema))
 		}

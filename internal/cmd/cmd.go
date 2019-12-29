@@ -110,7 +110,7 @@ var genCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		settings, err := dinosql.ParseConfig(bytes.NewReader(blob))
+		settings, err := dinosql.ParseConfigFile(bytes.NewReader(blob))
 		if err != nil {
 			switch err {
 			case dinosql.ErrMissingVersion:
@@ -169,7 +169,7 @@ var genCmd = &cobra.Command{
 				continue
 			}
 
-			files, err := dinosql.Generate(q, settings, pkg)
+			files, err := dinosql.Generate(q)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "# package %s\n", name)
 				fmt.Fprintf(os.Stderr, "error generating code: %s\n", err)
