@@ -155,7 +155,7 @@ var genCmd = &cobra.Command{
 				continue
 			}
 
-			q, err := dinosql.ParseQueries(c, settings, pkg)
+			q, err := dinosql.ParseQueries(c, pkg)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "# package %s\n", name)
 				if parserErr, ok := err.(*dinosql.ParserErr); ok {
@@ -169,7 +169,7 @@ var genCmd = &cobra.Command{
 				continue
 			}
 
-			files, err := dinosql.Generate(q)
+			files, err := dinosql.Generate(q, settings)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "# package %s\n", name)
 				fmt.Fprintf(os.Stderr, "error generating code: %s\n", err)
@@ -216,7 +216,7 @@ var checkCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if _, err := dinosql.ParseQueries(c, settings, pkg); err != nil {
+			if _, err := dinosql.ParseQueries(c, pkg); err != nil {
 				return err
 			}
 		}
@@ -239,7 +239,7 @@ var unstable__mysql = &cobra.Command{
 		}
 
 		for _, pkg := range settings.Packages {
-			res, err := mysql.GeneratePkg(pkg.Queries, settings, pkg)
+			res, err := mysql.GeneratePkg(pkg.Name, pkg.Queries, settings)
 			if err != nil {
 				return err
 			}

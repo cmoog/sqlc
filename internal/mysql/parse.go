@@ -235,9 +235,9 @@ func (q *Query) visitColNames(node sqlparser.SQLNode) (bool, error) {
 	return true, nil
 }
 
-func GeneratePkg(filepath string, settings dinosql.GenerateSettings) (map[string]string, error) {
+func GeneratePkg(pkgName string, querysPath string, settings dinosql.GenerateSettings) (map[string]string, error) {
 	s := NewSchema()
-	result, err := parseFile(filepath, "db", s, settings)
+	result, err := parseFile(querysPath, pkgName, s, settings)
 	if err != nil {
 		return nil, err
 	}
