@@ -168,7 +168,8 @@ func TestParseSelect(t *testing.T) {
 		input  expected
 		output *Query
 	}
-
+	query2 := `/* name: GetAll :many */
+						SELECT * FROM users;`
 	tests := []testCase{
 		testCase{
 			input: expected{
@@ -177,8 +178,7 @@ func TestParseSelect(t *testing.T) {
 				schema: mockSchema,
 			},
 			output: &Query{
-				SQL: `/* name: GetNameByID :one */
-								SELECT first_name, last_name FROM users WHERE id = ?`,
+				SQL:     `select first_name, last_name from users where id = :v1`,
 				Columns: filterCols(mockSchema.tables["users"], map[string]struct{}{"first_name": struct{}{}, "last_name": struct{}{}}),
 				Params: []*Param{
 					&Param{
@@ -188,6 +188,21 @@ func TestParseSelect(t *testing.T) {
 					}},
 				Name:             "GetNameByID",
 				Cmd:              ":one",
+				defaultTableName: "users",
+				schemaLookup:     mockSchema,
+			},
+		},
+		testCase{
+			input: expected{
+				query:  query2,
+				schema: mockSchema,
+			},
+			output: &Query{
+				SQL:              "select first_name, last_name, id, age from users",
+				Columns:          mockSchema.tables["users"],
+				Params:           []*Param{},
+				Name:             "GetAll",
+				Cmd:              ":many",
 				defaultTableName: "users",
 				schemaLookup:     mockSchema,
 			},
@@ -206,7 +221,7 @@ func TestParseSelect(t *testing.T) {
 		}
 		if !reflect.DeepEqual(testCase.output, q) {
 			t.Errorf("Parsing query returned differently than expected.")
-			// t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
+			t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
 		}
 	}
 }
@@ -266,7 +281,7 @@ func TestParseInsert(t *testing.T) {
 	query1 := `/* name: InsertNewUser :exec */
 	INSERT INTO users (first_name, last_name) VALUES (?, ?)`
 	query2 := `/* name: UpdateUserAt :exec */
-	UPDATE students SET first_name = ?, last_name = ? WHERE id > ? AND first_name = ? LIMIT 3`
+	UPDATE users SET first_name = ?, last_name = ? WHERE id > ? AND first_name = ? LIMIT 3`
 	tests := []testCase{
 		testCase{
 			input: expected{
@@ -332,21 +347,19 @@ func TestParseInsert(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range tests {
+	for ix, testCase := range tests {
 		q, err := parseQueryString(testCase.input.query, testCase.input.schema, mockSettings)
 		if err != nil {
-			t.Errorf("Parsing failed with query: [%v]\n", testCase.input.query)
+			t.Errorf("Parsing failed with query: [%v]\n", err)
 			continue
 		}
 
 		err = q.parseNameAndCmd()
 		if err != nil {
-			t.Errorf("Parsing failed withe query: [%v]\n", query)
+			t.Errorf("Parsing failed with query index: %d: [%v]\n", ix, query)
 		}
 		if !reflect.DeepEqual(testCase.output, q) {
 			t.Errorf("Parsing query returned differently than expected.")
-			testCase.output.schemaLookup = nil
-			q.schemaLookup = nil
 			t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
 		}
 	}
