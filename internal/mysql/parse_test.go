@@ -173,6 +173,38 @@ func TestParseSelect(t *testing.T) {
 	tests := []testCase{
 		testCase{
 			input: expected{
+				query: `/* name: GetCount :one */
+				SELECT id my_id, COUNT(id) id_count FROM users WHERE id > 4`,
+				schema: mockSchema,
+			},
+			output: &Query{
+				SQL: "select id as my_id, COUNT(id) as id_count from users where id > 4",
+				Columns: []*sqlparser.ColumnDefinition{
+					&sqlparser.ColumnDefinition{
+						Name: sqlparser.NewColIdent("my_id"),
+						Type: sqlparser.ColumnType{
+							Type:          "int",
+							NotNull:       true,
+							Autoincrement: true,
+						},
+					},
+					&sqlparser.ColumnDefinition{
+						Name: sqlparser.NewColIdent("id_count"),
+						Type: sqlparser.ColumnType{
+							Type:    "int",
+							NotNull: true,
+						},
+					},
+				},
+				Params:           []*Param{},
+				Name:             "GetCount",
+				Cmd:              ":one",
+				defaultTableName: "users",
+				schemaLookup:     mockSchema,
+			},
+		},
+		testCase{
+			input: expected{
 				query: `/* name: GetNameByID :one */
 								SELECT first_name, last_name FROM users WHERE id = ?`,
 				schema: mockSchema,
@@ -220,8 +252,10 @@ func TestParseSelect(t *testing.T) {
 			t.Errorf("Parsing failed withe query: [%v]\n:schema: %v", query, spew.Sdump(testCase.input.schema))
 		}
 		if !reflect.DeepEqual(testCase.output, q) {
+			// testCase.output.schemaLookup = nil
+			// q.schemaLookup = nil
 			t.Errorf("Parsing query returned differently than expected.")
-			t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
+			// t.Logf("Expected: %v\nResult: %v\n", spew.Sdump(testCase.output), spew.Sdump(q))
 		}
 	}
 }
