@@ -104,6 +104,20 @@ func (q *Query) parseNameAndCmd() error {
 }
 
 func parseSelect(tree *sqlparser.Select, query string, s *Schema, defaultTableName string, settings dinosql.GenerateSettings) (*Query, error) {
+	// handle * expressions first by expanding all columns of the default table
+	_, ok := tree.SelectExprs[0].(*sqlparser.StarExpr)
+	if ok {
+		colNames := []sqlparser.SelectExpr{}
+		colDfns := s.tables[defaultTableName]
+		for _, col := range colDfns {
+			colNames = append(colNames, &sqlparser.AliasedExpr{
+				Expr: &sqlparser.ColName{
+					Name: col.Name,
+				}},
+			)
+		}
+		tree.SelectExprs = colNames
+	}
 	parsedQuery := Query{
 		SQL:              query,
 		defaultTableName: defaultTableName,
@@ -129,6 +143,7 @@ func parseSelect(tree *sqlparser.Select, query string, s *Schema, defaultTableNa
 	if err != nil {
 		return nil, err
 	}
+	parsedQuery.SQL = sqlparser.String(tree)
 
 	return &parsedQuery, nil
 }
@@ -258,6 +273,7 @@ func (q *Query) parseLeadingComment(comment string) error {
 	}
 	return nil
 }
+func isExpr(exp sqlparser.Expr) {}
 
 func (q *Query) visit(node sqlparser.SQLNode) (bool, error) {
 	switch v := node.(type) {
@@ -266,6 +282,13 @@ func (q *Query) visit(node sqlparser.SQLNode) (bool, error) {
 		if err != nil {
 			return false, err
 		}
+	case *sqlparser.StarExpr:
+		cols, ok := q.schemaLookup.tables[q.defaultTableName]
+		if !ok {
+			return false, fmt.Errorf("Failed to expand * expression into columns from schema, tableName: %v", q.defaultTableName)
+		}
+		q.Columns = cols
+		return false, nil
 	default:
 		// fmt.Printf("Did not handle %T\n", v)
 	}

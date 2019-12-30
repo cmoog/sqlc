@@ -115,8 +115,6 @@ func paramInComparison(cond *sqlparser.ComparisonExpr, s *Schema, defaultTable s
 	return nil, false, nil
 }
 
-// Name gives the name string for use as a Go identifier
-
 func paramName(col sqlparser.ColIdent, originalName string) string {
 	str := col.String()
 	if !strings.HasPrefix(originalName, ":v") {
