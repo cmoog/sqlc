@@ -317,6 +317,7 @@ func parseSelectAliasExpr(exprs sqlparser.SelectExprs, s *Schema, defaultTable s
 	return colDfns
 }
 
+// GeneratePkg is the main entry to mysql generator package
 func GeneratePkg(pkgName string, querysPath string, settings dinosql.GenerateSettings) (map[string]string, error) {
 	s := NewSchema()
 	result, err := parseFile(querysPath, pkgName, s, settings)
