@@ -36,7 +36,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Enums: map[string]pg.Enum{
-							"status": pg.Enum{
+							"status": {
 								Name: "status",
 								Vals: []string{"open", "closed"},
 							},
@@ -51,7 +51,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Tables: map[string]pg.Table{
-							"venues": pg.Table{
+							"venues": {
 								Name: "venues",
 							},
 						},
@@ -69,7 +69,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Tables: map[string]pg.Table{
-							"foo": pg.Table{
+							"foo": {
 								Name: "foo",
 							},
 						},
@@ -86,7 +86,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Tables: map[string]pg.Table{
-							"foo": pg.Table{
+							"foo": {
 								Name: "foo",
 							},
 						},
@@ -103,7 +103,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Tables: map[string]pg.Table{
-							"foo": pg.Table{
+							"foo": {
 								Name:    "foo",
 								Columns: []pg.Column{{Name: "bar", DataType: "text", NotNull: true, Table: pg.FQN{Schema: "public", Rel: "foo"}}},
 							},
@@ -120,7 +120,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Tables: map[string]pg.Table{
-							"foo": pg.Table{
+							"foo": {
 								Name: "foo",
 								Columns: []pg.Column{
 									{Name: "bar", DataType: "text", IsArray: true, NotNull: true, Table: pg.FQN{Schema: "public", Rel: "foo"}},
@@ -140,7 +140,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Tables: map[string]pg.Table{
-							"foo": pg.Table{
+							"foo": {
 								Name:    "foo",
 								Columns: []pg.Column{{Name: "bar", DataType: "text", Table: pg.FQN{Schema: "public", Rel: "foo"}}},
 							},
@@ -158,7 +158,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Tables: map[string]pg.Table{
-							"foo": pg.Table{
+							"foo": {
 								Name:    "foo",
 								Columns: []pg.Column{{Name: "bar", DataType: "text", Table: pg.FQN{Schema: "public", Rel: "foo"}}},
 							},
@@ -176,7 +176,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Tables: map[string]pg.Table{
-							"foo": pg.Table{
+							"foo": {
 								Name:    "foo",
 								Columns: []pg.Column{{Name: "baz", DataType: "text", Table: pg.FQN{Schema: "public", Rel: "foo"}}},
 							},
@@ -194,7 +194,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Tables: map[string]pg.Table{
-							"foo": pg.Table{
+							"foo": {
 								Name:    "foo",
 								Columns: []pg.Column{{Name: "bar", DataType: "bool", Table: pg.FQN{Schema: "public", Rel: "foo"}}},
 							},
@@ -216,7 +216,7 @@ func TestUpdate(t *testing.T) {
 					"foo":    {},
 					"bar": {
 						Tables: map[string]pg.Table{
-							"baz": pg.Table{
+							"baz": {
 								Name: "baz",
 							},
 						},
@@ -230,7 +230,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Enums: map[string]pg.Enum{
-							"status": pg.Enum{
+							"status": {
 								Name: "status",
 								Vals: []string{"open", "closed"},
 							},
@@ -265,7 +265,7 @@ func TestUpdate(t *testing.T) {
 					"public": {
 						Enums: map[string]pg.Enum{},
 						Tables: map[string]pg.Table{
-							"arenas": pg.Table{
+							"arenas": {
 								Name: "arenas",
 							},
 						},
@@ -339,7 +339,7 @@ func TestUpdate(t *testing.T) {
 					"public": {
 						Enums: map[string]pg.Enum{},
 						Tables: map[string]pg.Table{
-							"venues": pg.Table{
+							"venues": {
 								Name: "venues",
 								Columns: []pg.Column{
 									{Name: "id", DataType: "serial", NotNull: true, Table: pg.FQN{Schema: "public", Rel: "venues"}},
@@ -358,7 +358,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Funcs: map[string][]pg.Function{
-							"foo": []pg.Function{
+							"foo": {
 								{
 									Name: "foo",
 									Arguments: []pg.Argument{
@@ -384,7 +384,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Funcs: map[string][]pg.Function{
-							"foo": []pg.Function{
+							"foo": {
 								{
 									Name: "foo",
 									Arguments: []pg.Argument{
@@ -424,7 +424,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Funcs: map[string][]pg.Function{
-							"foo": []pg.Function{
+							"foo": {
 								{
 									Name: "foo",
 									Arguments: []pg.Argument{
@@ -459,7 +459,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"public": {
 						Funcs: map[string][]pg.Function{
-							"foo": []pg.Function{
+							"foo": {
 								{
 									Name: "foo",
 									Arguments: []pg.Argument{
@@ -491,7 +491,7 @@ func TestUpdate(t *testing.T) {
 				Schemas: map[string]pg.Schema{
 					"pg_temp": {
 						Tables: map[string]pg.Table{
-							"migrate": pg.Table{
+							"migrate": {
 								Name: "migrate",
 								Columns: []pg.Column{
 									{Name: "val", DataType: "pg_catalog.int4", NotNull: false, Table: pg.FQN{Schema: "pg_temp", Rel: "migrate"}},

@@ -248,12 +248,12 @@ func ModelImports(r Generateable, settings GenerateSettings) [][]string {
 	}
 
 	pkgs := make([]string, 0, len(pkg))
-	for p, _ := range pkg {
+	for p := range pkg {
 		pkgs = append(pkgs, p)
 	}
 
 	stds := make([]string, 0, len(std))
-	for s, _ := range std {
+	for s := range std {
 		stds = append(stds, s)
 	}
 
@@ -342,7 +342,7 @@ func QueryImports(r Generateable, settings GenerateSettings, filename string) []
 	}
 
 	std := map[string]struct{}{
-		"context": struct{}{},
+		"context": {},
 	}
 	if uses("sql.Null") {
 		std["database/sql"] = struct{}{}
@@ -386,12 +386,12 @@ func QueryImports(r Generateable, settings GenerateSettings, filename string) []
 	}
 
 	pkgs := make([]string, 0, len(pkg))
-	for p, _ := range pkg {
+	for p := range pkg {
 		pkgs = append(pkgs, p)
 	}
 
 	stds := make([]string, 0, len(std))
-	for s, _ := range std {
+	for s := range std {
 		stds = append(stds, s)
 	}
 

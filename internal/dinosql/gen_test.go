@@ -100,15 +100,15 @@ func init() {
 	mockSettings = GenerateSettings{
 		Version: "1",
 		Packages: []PackageSettings{
-			PackageSettings{
+			{
 				Name: "db",
 			},
-			PackageSettings{
+			{
 				Name:                "prepared",
 				Queries:             filepath.Join("testdata", "ondeck", "query"),
 				EmitPreparedQueries: true,
 			},
-			PackageSettings{
+			{
 				Name:         "ondeck",
 				Queries:      filepath.Join("testdata", "ondeck", "query"),
 				EmitJSONTags: true,

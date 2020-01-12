@@ -15,16 +15,16 @@ func TestSelectParamSearcher(t *testing.T) {
 	}
 
 	tests := []testCase{
-		testCase{
+		{
 			input: "SELECT first_name, id, last_name FROM users WHERE id < ?",
-			output: []*Param{&Param{
+			output: []*Param{{
 				OriginalName: ":v1",
 				Name:         "id",
 				Typ:          "int",
 			},
 			},
 		},
-		testCase{
+		{
 			input: `SELECT
 								users.id,
 								users.first_name,
@@ -34,41 +34,41 @@ func TestSelectParamSearcher(t *testing.T) {
 							LEFT JOIN users ON orders.user_id = users.id
 							WHERE orders.price > :minPrice`,
 			output: []*Param{
-				&Param{
+				{
 					OriginalName: ":minPrice",
 					Name:         "minPrice",
 					Typ:          "float64",
 				},
 			},
 		},
-		testCase{
+		{
 			input: "SELECT first_name, id, last_name FROM users WHERE id = :targetID",
-			output: []*Param{&Param{
+			output: []*Param{{
 				OriginalName: ":targetID",
 				Name:         "targetID",
 				Typ:          "int",
 			},
 			},
 		},
-		testCase{
+		{
 			input: "SELECT first_name, last_name FROM users WHERE age < :maxAge AND last_name = :inFamily",
 			output: []*Param{
-				&Param{
+				{
 					OriginalName: ":maxAge",
 					Name:         "maxAge",
 					Typ:          "int",
 				},
-				&Param{
+				{
 					OriginalName: ":inFamily",
 					Name:         "inFamily",
 					Typ:          "sql.NullString",
 				},
 			},
 		},
-		testCase{
+		{
 			input: "SELECT first_name, last_name FROM users LIMIT ?",
 			output: []*Param{
-				&Param{
+				{
 					OriginalName: ":v1",
 					Name:         "limit",
 					Typ:          "uint32",
@@ -117,15 +117,15 @@ func TestInsertParamSearcher(t *testing.T) {
 	}
 
 	tests := []testCase{
-		testCase{
+		{
 			input: "INSERT INTO users (first_name, last_name) VALUES (?, ?)",
 			output: []*Param{
-				&Param{
+				{
 					OriginalName: ":v1",
 					Name:         "first_name",
 					Typ:          "string",
 				},
-				&Param{
+				{
 					OriginalName: ":v2",
 					Name:         "last_name",
 					Typ:          "sql.NullString",

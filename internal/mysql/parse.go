@@ -257,7 +257,7 @@ func parseFrom(from sqlparser.TableExprs, isLeftJoined bool) (FromTables, string
 			}
 			return right, leftMostTableName, nil
 		default:
-			return nil, "",  fmt.Errorf("failed to parse table expr: %v", spew.Sdump(v))
+			return nil, "", fmt.Errorf("failed to parse table expr: %v", spew.Sdump(v))
 		}
 	}
 	return tables, defaultTableName, nil

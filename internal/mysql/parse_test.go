@@ -22,7 +22,7 @@ const configPath = "test_data/sqlc.json"
 var mockSettings = dinosql.GenerateSettings{
 	Version: "1",
 	Packages: []dinosql.PackageSettings{
-		dinosql.PackageSettings{
+		{
 			Name: "db",
 		},
 	},
@@ -58,21 +58,21 @@ func initMockSchema() {
 		tables: schemaMap,
 	}
 	schemaMap["users"] = []*sqlparser.ColumnDefinition{
-		&sqlparser.ColumnDefinition{
+		{
 			Name: sqlparser.NewColIdent("first_name"),
 			Type: sqlparser.ColumnType{
 				Type:    "varchar",
 				NotNull: true,
 			},
 		},
-		&sqlparser.ColumnDefinition{
+		{
 			Name: sqlparser.NewColIdent("last_name"),
 			Type: sqlparser.ColumnType{
 				Type:    "varchar",
 				NotNull: false,
 			},
 		},
-		&sqlparser.ColumnDefinition{
+		{
 			Name: sqlparser.NewColIdent("id"),
 			Type: sqlparser.ColumnType{
 				Type:          "int",
@@ -80,7 +80,7 @@ func initMockSchema() {
 				Autoincrement: true,
 			},
 		},
-		&sqlparser.ColumnDefinition{
+		{
 			Name: sqlparser.NewColIdent("age"),
 			Type: sqlparser.ColumnType{
 				Type:    "int",
@@ -89,7 +89,7 @@ func initMockSchema() {
 		},
 	}
 	schemaMap["orders"] = []*sqlparser.ColumnDefinition{
-		&sqlparser.ColumnDefinition{
+		{
 			Name: sqlparser.NewColIdent("id"),
 			Type: sqlparser.ColumnType{
 				Type:          "int",
@@ -97,7 +97,7 @@ func initMockSchema() {
 				Autoincrement: true,
 			},
 		},
-		&sqlparser.ColumnDefinition{
+		{
 			Name: sqlparser.NewColIdent("price"),
 			Type: sqlparser.ColumnType{
 				Type:          "DECIMAL(13, 4)",
@@ -105,7 +105,7 @@ func initMockSchema() {
 				Autoincrement: true,
 			},
 		},
-		&sqlparser.ColumnDefinition{
+		{
 			Name: sqlparser.NewColIdent("user_id"),
 			Type: sqlparser.ColumnType{
 				Type:    "int",
@@ -139,7 +139,7 @@ func TestParseSelect(t *testing.T) {
 		output *Query
 	}
 	tests := []testCase{
-		testCase{
+		{
 			name: "get_count",
 			input: expected{
 				query: `/* name: GetCount :one */
@@ -149,7 +149,7 @@ func TestParseSelect(t *testing.T) {
 			output: &Query{
 				SQL: "select id as my_id, COUNT(id) as id_count from users where id > 4",
 				Columns: []Column{
-					Column{
+					{
 						&sqlparser.ColumnDefinition{
 							Name: sqlparser.NewColIdent("my_id"),
 							Type: sqlparser.ColumnType{
@@ -160,7 +160,7 @@ func TestParseSelect(t *testing.T) {
 						},
 						"users",
 					},
-					Column{
+					{
 						&sqlparser.ColumnDefinition{
 							Name: sqlparser.NewColIdent("id_count"),
 							Type: sqlparser.ColumnType{
@@ -178,7 +178,7 @@ func TestParseSelect(t *testing.T) {
 				SchemaLookup:     mockSchema,
 			},
 		},
-		testCase{
+		{
 			name: "get_name_by_id",
 			input: expected{
 				query: `/* name: GetNameByID :one */
@@ -189,7 +189,7 @@ func TestParseSelect(t *testing.T) {
 				SQL:     `select first_name, last_name from users where id = ?`,
 				Columns: filterCols(mockSchema.tables["users"], map[string]string{"first_name": "users", "last_name": "users"}),
 				Params: []*Param{
-					&Param{
+					{
 						OriginalName: ":v1",
 						Name:         "id",
 						Typ:          "int",
@@ -200,7 +200,7 @@ func TestParseSelect(t *testing.T) {
 				SchemaLookup:     mockSchema,
 			},
 		},
-		testCase{
+		{
 			name: "get_all",
 			input: expected{
 				query: `/* name: GetAll :many */
@@ -217,7 +217,7 @@ func TestParseSelect(t *testing.T) {
 				SchemaLookup:     mockSchema,
 			},
 		},
-		testCase{
+		{
 			name: "get_all_users_orders",
 			input: expected{
 				query: `/* name: GetAllUsersOrders :many */
@@ -228,7 +228,7 @@ func TestParseSelect(t *testing.T) {
 			output: &Query{
 				SQL: "select u.id as user_id, u.first_name, o.price, o.id as order_id from orders as o left join users as u on u.id = o.user_id",
 				Columns: []Column{
-					Column{
+					{
 						&sqlparser.ColumnDefinition{
 							Name: sqlparser.NewColIdent("user_id"),
 							Type: sqlparser.ColumnType{
@@ -239,7 +239,7 @@ func TestParseSelect(t *testing.T) {
 						},
 						"users",
 					},
-					Column{
+					{
 						&sqlparser.ColumnDefinition{
 							Name: sqlparser.NewColIdent("first_name"),
 							Type: sqlparser.ColumnType{
@@ -249,7 +249,7 @@ func TestParseSelect(t *testing.T) {
 						},
 						"users",
 					},
-					Column{
+					{
 						&sqlparser.ColumnDefinition{
 							Name: sqlparser.NewColIdent("price"),
 							Type: sqlparser.ColumnType{
@@ -260,7 +260,7 @@ func TestParseSelect(t *testing.T) {
 						},
 						"orders",
 					},
-					Column{
+					{
 						&sqlparser.ColumnDefinition{
 							Name: sqlparser.NewColIdent("order_id"),
 							Type: sqlparser.ColumnType{
@@ -313,7 +313,7 @@ func TestParseLeadingComment(t *testing.T) {
 	}
 
 	tests := []testCase{
-		testCase{
+		{
 			input:  "/* name: GetPeopleByID :many */",
 			output: expected{name: "GetPeopleByID", cmd: ":many"},
 		},
@@ -357,7 +357,7 @@ func TestParseInsertUpdate(t *testing.T) {
 	}
 
 	tests := []testCase{
-		testCase{
+		{
 			name: "insert_users",
 			input: expected{
 				query:  "/* name: InsertNewUser :exec */\nINSERT INTO users (first_name, last_name) VALUES (?, ?)",
@@ -367,12 +367,12 @@ func TestParseInsertUpdate(t *testing.T) {
 				SQL:     "insert into users(first_name, last_name) values (?, ?)",
 				Columns: nil,
 				Params: []*Param{
-					&Param{
+					{
 						OriginalName: ":v1",
 						Name:         "first_name",
 						Typ:          "string",
 					},
-					&Param{
+					{
 						OriginalName: ":v2",
 						Name:         "last_name",
 						Typ:          "sql.NullString",
@@ -384,7 +384,7 @@ func TestParseInsertUpdate(t *testing.T) {
 				SchemaLookup:     mockSchema,
 			},
 		},
-		testCase{
+		{
 			name: "update_without_where",
 			input: expected{
 				query:  "/* name: UpdateAllUsers :exec */ update users set first_name = 'Bob'",
@@ -400,7 +400,7 @@ func TestParseInsertUpdate(t *testing.T) {
 				SchemaLookup:     mockSchema,
 			},
 		},
-		testCase{
+		{
 			name: "update_users",
 			input: expected{
 				query:  "/* name: UpdateUserAt :exec */\nUPDATE users SET first_name = ?, last_name = ? WHERE id > ? AND first_name = ? LIMIT 3",
@@ -410,22 +410,22 @@ func TestParseInsertUpdate(t *testing.T) {
 				SQL:     "update users set first_name = ?, last_name = ? where id > ? and first_name = ? limit 3",
 				Columns: nil,
 				Params: []*Param{
-					&Param{
+					{
 						OriginalName: ":v1",
 						Name:         "first_name",
 						Typ:          "string",
 					},
-					&Param{
+					{
 						OriginalName: ":v2",
 						Name:         "last_name",
 						Typ:          "sql.NullString",
 					},
-					&Param{
+					{
 						OriginalName: ":v3",
 						Name:         "id",
 						Typ:          "int",
 					},
-					&Param{
+					{
 						OriginalName: ":v4",
 						Name:         "first_name",
 						Typ:          "string",
@@ -437,7 +437,7 @@ func TestParseInsertUpdate(t *testing.T) {
 				SchemaLookup:     mockSchema,
 			},
 		},
-		testCase{
+		{
 			name: "insert_users_from_orders",
 			input: expected{
 				query:  "/* name: InsertUsersFromOrders :exec */\ninsert into users ( first_name ) select user_id from orders where id = ?;",
@@ -447,7 +447,7 @@ func TestParseInsertUpdate(t *testing.T) {
 				SQL:     "insert into users(first_name) select user_id from orders where id = ?",
 				Columns: nil,
 				Params: []*Param{
-					&Param{
+					{
 						OriginalName: ":v1",
 						Name:         "id",
 						Typ:          "int",

@@ -2,8 +2,6 @@
 
 package jets
 
-import ()
-
 type Jet struct {
 	ID      int32
 	PilotID int32
