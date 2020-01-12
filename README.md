@@ -8,6 +8,9 @@
 >
 > 🚨
 
+![Go Report Card](https://goreportcard.com/badge/github.com/kyleconroy/sqlc)
+![Github Release](https://img.shields.io/github/v/release/kyleconroy/sqlc)
+
 # sqlc: A SQL Compiler
 
 > And lo, the Great One looked down upon the people and proclaimed:
