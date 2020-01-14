@@ -8,6 +8,8 @@
 >
 > 🚨
 
+<img src="https://sqlc.dev/logo.png" width="250"/>
+
 ![Go Report Card](https://goreportcard.com/badge/github.com/kyleconroy/sqlc)
 ![Github Release](https://img.shields.io/github/v/release/kyleconroy/sqlc)
 
@@ -15,7 +17,7 @@
 
 > And lo, the Great One looked down upon the people and proclaimed:
 >
->   "SQL is actually pretty great"
+> "SQL is actually pretty great"
 
 sqlc generates **fully-type safe idiomatic Go code** from SQL. Here's how it
 works:
@@ -42,12 +44,12 @@ you ever:
   values
 - Changed the type of a column but forgot to change the type in your code?
 
-All of these errors are *impossible* with sqlc. Wait, what? How?
+All of these errors are _impossible_ with sqlc. Wait, what? How?
 
 sqlc parses your all of your queries and the DDL (e.g. `CREATE TABLE`)
 statements during the code generation processes so that it knows the names and
-types of every column in your tables and every expression in your queries.  If
-any of them do not match, sqlc *will fail to compile your queries*, preventing
+types of every column in your tables and every expression in your queries. If
+any of them do not match, sqlc _will fail to compile your queries_, preventing
 entire classes of runtime problems at compile time.
 
 Likewise, the methods that sqlc generates for you have a strict arity and
@@ -56,6 +58,7 @@ arguments or a column's type but don't update your code, it will fail to
 compile.
 
 ## Getting Started
+
 Okay, enough hype, let's see it in action.
 
 First you pass the following SQL to `sqlc generate`:
@@ -231,6 +234,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 ## Examples
 
 Your favorite PostgreSQL / Go features are supported:
+
 - SQL
   - [Query annotations](./docs/annotations.md)
   - [Transactions](./docs/transactions.md)
@@ -300,6 +304,7 @@ in the directory where the `sqlc` command is run.
 ```
 
 Each package document has the following keys:
+
 - `name`:
   - The package name to use for the generated code. Defaults to `path` basename
 - `emit_json_tags`:
@@ -341,6 +346,7 @@ instead.
 ```
 
 Each override document has the following keys:
+
 - `postgres_type`:
   - The PostgreSQL type to override. Find the full list of supported types in [gen.go](https://github.com/kyleconroy/sqlc/blob/master/internal/dinosql/gen.go#L438).
 - `go_type`:
@@ -387,7 +393,6 @@ scopes the override behavior to just a single package:
 }
 ```
 
-
 ### Renaming Struct Fields
 
 Struct field names are generated from column names using a simple algorithm:
@@ -417,6 +422,7 @@ field name to use.
 ## Downloads
 
 Each commit is deployed to the [`devel` channel on Equinox](https://dl.equinox.io/sqlc/sqlc/devel):
+
 - [Linux](https://bin.equinox.io/c/gvM95th6ps1/sqlc-devel-linux-amd64.tgz)
 - [macOS](https://bin.equinox.io/c/gvM95th6ps1/sqlc-devel-darwin-amd64.zip)
 
@@ -425,10 +431,10 @@ Each commit is deployed to the [`devel` channel on Equinox](https://dl.equinox.i
 sqlc currently only supports PostgreSQL / Go. MySQL support has been merged,
 but it's marked as experimental. SQLite and TypeScript support are planned.
 
-| Language     | PostgreSQL       | MySQL            | SQLite           |
-| ------------ |:----------------:|:----------------:|:----------------:|
-| Go           |:white_check_mark:|:warning:         |:timer_clock:     |
-| TypeScript   |:timer_clock:     |:timer_clock:     |:timer_clock:     |
+| Language   |     PostgreSQL     |     MySQL     |    SQLite     |
+| ---------- | :----------------: | :-----------: | :-----------: |
+| Go         | :white_check_mark: |   :warning:   | :timer_clock: |
+| TypeScript |   :timer_clock:    | :timer_clock: | :timer_clock: |
 
 If you'd like to add another database or language, we'd welcome a contribution.
 
